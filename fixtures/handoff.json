@@ -1,0 +1,11 @@
+{
+  "_note": "Two humans and one agent: one answered handoff per pairing, and one dropped. Known answers in test/metrics.test.ts.",
+  "roster": { "ana": "human", "ben": "human", "shaper": "agent" },
+  "messages": [
+    { "id": "h1", "author": "ana", "at": 0, "mentions": ["ben"] },
+    { "id": "h2", "author": "ben", "at": 120, "mentions": ["shaper"] },
+    { "id": "h3", "author": "shaper", "at": 150, "mentions": ["ana"] },
+    { "id": "h4", "author": "ana", "at": 450, "mentions": ["shaper"] },
+    { "id": "h5", "author": "ben", "at": 500, "mentions": [] }
+  ]
+}

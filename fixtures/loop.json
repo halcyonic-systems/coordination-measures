@@ -1,0 +1,14 @@
+{
+  "_note": "Two agents mention each other back and forth until a human steps in. Known answers in test/metrics.test.ts.",
+  "roster": { "scout": "agent", "referee": "agent", "shingai": "human" },
+  "messages": [
+    { "id": "m1", "author": "shingai", "at": 0, "mentions": ["scout"] },
+    { "id": "m2", "author": "scout", "at": 30, "mentions": ["referee"] },
+    { "id": "m3", "author": "referee", "at": 60, "mentions": ["scout"] },
+    { "id": "m4", "author": "scout", "at": 90, "mentions": ["referee"] },
+    { "id": "m5", "author": "referee", "at": 120, "mentions": ["scout"] },
+    { "id": "m6", "author": "scout", "at": 150, "mentions": ["referee"] },
+    { "id": "m7", "author": "referee", "at": 180, "mentions": ["scout"] },
+    { "id": "m8", "author": "shingai", "at": 600, "mentions": [] }
+  ]
+}

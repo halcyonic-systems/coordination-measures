@@ -1,0 +1,27 @@
+{
+  "name": "coordination-monitor",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Measures how humans and agents coordinate in Buzz channels: a pure core of process measures, a read-only Buzz plugin that shows them, and an analyst agent that labels failures",
+  "scripts": {
+    "test": "tsx --test test/*.test.ts",
+    "typecheck": "tsc --noEmit",
+    "measure": "tsx src/cli.ts",
+    "plugin:build": "node plugin/build.mjs",
+    "plugin:check": "node plugin/check.mjs",
+    "preview:build": "node plugin/preview/build.mjs",
+    "preview": "node plugin/preview/build.mjs && python3 -m http.server 4418 --bind 127.0.0.1 --directory plugin/preview"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.6",
+    "@types/react": "^18.3.31",
+    "@types/react-dom": "^18.3.7",
+    "esbuild": "^0.28.2",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "tsx": "^4.23.15",
+    "typescript": "^5.9.3"
+  },
+  "license": "MIT"
+}

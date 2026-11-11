@@ -1,0 +1,16 @@
+{
+  "id": "halcyonic.coordination",
+  "name": "Coordination",
+  "apiVersion": 1,
+  "description": "See how people and agents coordinate in a channel: who hands off to whom, how fast they answer, where agents loop and when a human steps in.",
+  "discovery": {
+    "category": "agent-tools",
+    "tags": [
+      "Coordination",
+      "Multi-agent",
+      "Handoffs",
+      "Metrics",
+      "Research"
+    ]
+  }
+}
