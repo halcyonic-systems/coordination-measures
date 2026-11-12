@@ -10,7 +10,7 @@ export function Tiles({ summary: s, colors }: { summary: Summary; colors: Record
   const [ref, width] = useWidth()
   const columns = width >= 620 ? 4 : width >= 300 || !width ? 2 : 1
   // A flex row keeps a mark beside its count whatever the host's styles make of an inline svg.
-  const count: React.CSSProperties = { display: 'inline-flex', alignItems: 'center', gap: 4, whiteSpace: 'nowrap' }
+  const count: React.CSSProperties = { display: 'inline-flex', alignItems: 'center', gap: 3, whiteSpace: 'nowrap' }
   return (
     <div ref={ref} style={{ display: 'grid', gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))`, gap: t.gap }}>
       <Tile label="Messages" value={String(total)}>
@@ -21,7 +21,7 @@ export function Tiles({ summary: s, colors }: { summary: Summary; colors: Record
               {human > 0 && <span style={{ flex: human, background: colors.human, borderRadius: 3 }} />}
               {agent > 0 && <span style={{ flex: agent, background: colors.agent, borderRadius: 3 }} />}
             </span>
-            <span style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+            <span style={{ display: 'flex', columnGap: 6, flexWrap: 'wrap' }}>
               <span style={count}><RoleMark role="human" color={colors.human} size={10} /> {human} human</span>
               <span style={count}><RoleMark role="agent" color={colors.agent} size={10} /> {agent} agent</span>
             </span>

@@ -81,7 +81,7 @@ Buzz plugins run as unsandboxed code inside the app, and the session a plugin re
 ## State (2026-11-12)
 
 - Core: 16 tests pass. Plugin: builds and passes its check; planted writes fail it.
-- Runs in Buzz (2026-11-10, a 0.7.0 preview build): the page lists joined channels, reads a live channel, shows names, recognises an agent from its profile and counts human to agent handoffs. A channel of two people and five agents has been read too (40 messages, 66 handoffs, every pairing present). Copy as HTML has only run in the preview. Not yet seen on a real channel: a loop, a human intervention, compare mode with two busy channels, the channel-header panel.
+- Runs in Buzz (2026-11-10, a 0.7.0 preview build): the page lists joined channels, reads a live channel, shows names, recognises an agent from its profile and counts human to agent handoffs. A channel of two people and five agents has been read too (40 messages, 66 handoffs, every pairing present). Copy as HTML works there too. Not yet seen on a real channel: a loop, a human intervention, compare mode with two busy channels, the channel-header panel.
 
 ## License
 
