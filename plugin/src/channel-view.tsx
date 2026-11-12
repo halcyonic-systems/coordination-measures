@@ -36,7 +36,7 @@ const spanText = (s: Summary): string => {
   return clock(from) === clock(to) ? `${day(from)}, ${clock(from)}` : `${day(from)}, ${clock(from)} to ${clock(to)}`
 }
 
-export function ChannelView({ name, state, colors, compact = false, anonymous = false }: { name: string; state: ChannelState; colors: Record<Role, string>; compact?: boolean; anonymous?: boolean }) {
+export function ChannelView({ name, state, colors, compact = false, anonymous = false, bare = false }: { name: string; state: ChannelState; colors: Record<Role, string>; compact?: boolean; anonymous?: boolean; bare?: boolean }) {
   const m = useMeasures(state, anonymous)
   const column: React.CSSProperties = { display: 'flex', flexDirection: 'column', gap: t.gap, minWidth: 0 }
 
@@ -67,20 +67,20 @@ export function ChannelView({ name, state, colors, compact = false, anonymous = 
           {/* Without a mention there is no handoff to pair or draw; the tile above says so. */}
           {s.allHandoffs.total > 0 && <div style={{ display: 'flex', flexWrap: 'wrap', gap: t.gap }}>
             <div style={{ flex: compact ? '1 1 100%' : '1 1 380px', minWidth: 0 }}>
-              <Card title="Who hands off to whom" note={`Answered within ${duration(s.options.handoffWindow)}`}>
+              <Card bare={bare} title="Who hands off to whom" note={`Answered within ${duration(s.options.handoffWindow)}`}>
                 <Pairings summary={s} colors={colors} />
               </Card>
             </div>
             <div style={{ flex: compact ? '1 1 100%' : '1 1 380px', minWidth: 0 }}>
-              <Card title="Handoff network">
+              <Card bare={bare} title="Handoff network">
                 <Network people={m.people} edges={m.edges} names={m.names} colors={colors} />
               </Card>
             </div>
           </div>}
-          <Card title="Timeline">
+          <Card bare={bare} title="Timeline">
             <Timeline beats={m.beats} handoffs={m.handoffs} names={m.names} colors={colors} />
           </Card>
-          <Card title="People">
+          <Card bare={bare} title="People">
             <People people={m.people} names={m.names} colors={colors} handoffs={s.allHandoffs.total > 0} />
           </Card>
           {m.capped && <Quiet>Measured over the latest {MESSAGE_LIMIT} messages, the most Buzz returns in one read.</Quiet>}

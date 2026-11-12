@@ -2,13 +2,19 @@
 
 A Buzz plugin that shows how the people and agents in a channel coordinate: who hands off to whom, how fast they answer, where agents loop and when a human steps in.
 
+<img src="docs/channel.png" alt="One channel measured: tiles, who hands off to whom, the handoff network, the timeline and the people" width="620">
+
+*A real channel in Buzz, names hidden: two people and four agents, 40 messages. Handoffs to an agent were answered 77% of the time when a person sent them and 100% when an agent did; handoffs to a person, 25% and 28%. One small channel: something seen once, not a finding.*
+
+Benchmarks for agent teams measure what a team achieves: reward, cost, throughput. This measures how the team coordinates while it works, in the channel where it works, with people in it.
+
+Every number is a plain count of who posted, when, and whom they mentioned. The plugin never reads what a message says, and no model is involved.
+
+Put two channels side by side and the same definitions apply to both, so a difference is a difference in coordination:
+
 ![Two channels side by side: agents with a coordinator and agents without one](docs/compare.png)
 
 *The browser preview, with invented channels. Not real data.*
-
-Benchmarks for agent teams measure what a team achieves: reward, cost, throughput. This measures how the team coordinates while it works, in the channel where it works, with people in it. Put two channels side by side and the same definitions apply to both, so a difference is a difference in coordination.
-
-Code counts; nothing reads what a message says. A separate agent, the analyst, labels what counts cannot see (`analyst/charter.md`).
 
 ## Use it in your community
 
@@ -75,13 +81,13 @@ Buzz plugins run as unsandboxed code inside the app, and the session a plugin re
 
 - **Coordination without mentions.** Agents that act on a message nobody addressed to them leave no handoff. Buzz's signed `audience` tag for agent-to-agent messages is a candidate second signal.
 - **Benchmark timelines.** Run the same core over the per-trial message timelines Block's Orchestra harness keeps, to compare team shapes under assigned conditions.
-- **The analyst.** An agent that labels agent failures against MAST's 14 modes, kept independent of the counts so their agreement means something.
+- **The analyst.** Counts cannot say why a handoff failed. A separate agent, not built yet, would read the messages and label agent failures against MAST's 14 failure modes (`analyst/charter.md`). It is kept apart from the counts so that the two can be checked against each other.
 - **Verified roles.** Check the owner attestation's signature instead of reading it as a hint.
 
 ## State (2026-11-12)
 
 - Core: 16 tests pass. Plugin: builds and passes its check; planted writes fail it.
-- Runs in Buzz (2026-11-10, a 0.7.0 preview build): the page lists joined channels, reads a live channel, shows names, recognises an agent from its profile and counts human to agent handoffs. A channel of two people and five agents has been read too (40 messages, 66 handoffs, every pairing present). Copy as HTML works there too. Not yet seen on a real channel: a loop, a human intervention, compare mode with two busy channels, the channel-header panel.
+- Runs in Buzz (2026-11-10, a 0.7.0 preview build): the page lists joined channels, reads a live channel, shows names, recognises an agent from its profile and counts human to agent handoffs. A channel of two people and four agents has been read too (40 messages, 66 handoffs, every pairing present). Copy as HTML works there too. Not yet seen on a real channel: a loop, a human intervention, compare mode with two busy channels, the channel-header panel.
 
 ## License
 

@@ -31,6 +31,12 @@ export function CoordinationPage({ relay }: { relay: Relay }) {
   Object.assign(chosen, { a, b, comparing, anonymous })
   const content = React.useRef<HTMLDivElement>(null)
   const [copied, setCopied] = React.useState<'' | 'Copied' | 'Could not copy'>('')
+  // The button's word goes back after a moment; the timer is dropped if the page closes first.
+  React.useEffect(() => {
+    if (!copied) return
+    const timer = setTimeout(() => setCopied(''), 2500)
+    return () => clearTimeout(timer)
+  }, [copied])
 
   // Fall back to the first channel when nothing is chosen or the choice is gone.
   const has = (id?: string) => !!id && channels.some((c) => c.id === id)
@@ -60,11 +66,7 @@ export function CoordinationPage({ relay }: { relay: Relay }) {
   const copy = () => {
     if (!content.current) return
     const still = snapshot(content.current, comparing && idB ? `${nameOf(idA)} and ${nameOf(idB)}` : nameOf(idA))
-    const done = (word: 'Copied' | 'Could not copy') => {
-      setCopied(word)
-      setTimeout(() => setCopied(''), 2500)
-    }
-    navigator.clipboard.writeText(still).then(() => done('Copied'), () => done('Could not copy'))
+    navigator.clipboard.writeText(still).then(() => setCopied('Copied'), () => setCopied('Could not copy'))
   }
 
   return (

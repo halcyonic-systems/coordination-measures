@@ -33,7 +33,7 @@ export function ChannelPanel({ relay, channelContext }: { relay: Relay; channelC
   if (!channelContext) return <div style={{ padding: t.inset }}><Quiet>Open this from a channel to measure it.</Quiet></div>
   return (
     <div style={{ padding: t.inset, color: t.text, overflowY: 'auto', height: '100%', boxSizing: 'border-box' }}>
-      <ChannelView name={channelContext.channelName} state={state} colors={colors} compact />
+      <ChannelView name={channelContext.channelName} state={state} colors={colors} compact bare />
     </div>
   )
 }

@@ -14,9 +14,13 @@ export function RoleMark({ role, color, size = 12, hollow = false }: { role: Rol
   )
 }
 
-export function Card({ title, note, children }: { title: string; note?: string; children: React.ReactNode }) {
+/**
+ * A titled section. On the page it is a card; in the channel panel, which already sits inside a
+ * card the app draws, it is a plain section under a rule (Buzz: "render only the body").
+ */
+export function Card({ title, note, bare = false, children }: { title: string; note?: string; bare?: boolean; children: React.ReactNode }) {
   return (
-    <section className="ui-card" style={{ padding: t.inset, minWidth: 0, height: '100%', boxSizing: 'border-box' }}>
+    <section className={bare ? undefined : 'ui-card'} style={bare ? { paddingTop: 12, borderTop: `1px solid ${t.border}`, minWidth: 0 } : { padding: t.inset, minWidth: 0, height: '100%', boxSizing: 'border-box' }}>
       <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: t.gap, flexWrap: 'wrap', marginBottom: 12 }}>
         <h3 style={{ margin: 0 }}>{title}</h3>
         {note && <span style={{ color: t.subtle, fontSize: 12 }}>{note}</span>}
