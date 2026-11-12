@@ -531,9 +531,105 @@ function useChannelData(session, channelId) {
   return { ...state, refresh };
 }
 
+// plugin/src/snapshot.ts
+var TOKENS = ["--text-standard", "--text-subtle", "--border-standard", "--surface-panel", "--space-panel-inset", "--space-2"];
+var COPIED = [
+  "display",
+  "box-sizing",
+  "font-family",
+  "font-size",
+  "font-weight",
+  "font-style",
+  "font-variant-numeric",
+  "line-height",
+  "letter-spacing",
+  "color",
+  "background-color",
+  "text-align",
+  "vertical-align",
+  "white-space",
+  "text-transform",
+  "opacity",
+  "box-shadow",
+  "margin-top",
+  "margin-right",
+  "margin-bottom",
+  "margin-left",
+  "padding-top",
+  "padding-right",
+  "padding-bottom",
+  "padding-left",
+  "border-top-width",
+  "border-right-width",
+  "border-bottom-width",
+  "border-left-width",
+  "border-top-style",
+  "border-right-style",
+  "border-bottom-style",
+  "border-left-style",
+  "border-top-color",
+  "border-right-color",
+  "border-bottom-color",
+  "border-left-color",
+  "border-top-left-radius",
+  "border-top-right-radius",
+  "border-bottom-left-radius",
+  "border-bottom-right-radius",
+  "flex-direction",
+  "flex-wrap",
+  "flex-grow",
+  "flex-shrink",
+  "flex-basis",
+  "align-items",
+  "justify-content",
+  "row-gap",
+  "column-gap",
+  "grid-template-columns",
+  "table-layout",
+  "border-collapse",
+  "position"
+];
+var escape = (s) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+function backdrop(el) {
+  for (let at = el; at; at = at.parentElement) {
+    const c = getComputedStyle(at).backgroundColor;
+    if (c && c !== "transparent" && !/,\s*0\)$/.test(c)) return c;
+  }
+  return "#ffffff";
+}
+function snapshot(root, title) {
+  const copy = root.cloneNode(true);
+  const pairs = [[root, copy]];
+  for (let i = 0; i < pairs.length; i++) {
+    const [from, to] = pairs[i];
+    const svgPart = from instanceof SVGElement && from.tagName.toLowerCase() !== "svg";
+    if (!svgPart) {
+      const seen2 = getComputedStyle(from);
+      const style = to.style;
+      for (const name of COPIED) style.setProperty(name, seen2.getPropertyValue(name));
+    }
+    for (let n = 0; n < from.children.length; n++) pairs.push([from.children[n], to.children[n]]);
+  }
+  for (const el of [...copy.querySelectorAll("[data-controls]")]) el.remove();
+  const seen = getComputedStyle(root);
+  const tokens = TOKENS.map((name) => [name, seen.getPropertyValue(name).trim()]).filter(([, value]) => value);
+  const [width, height] = [Math.ceil(root.getBoundingClientRect().width), Math.ceil(root.scrollHeight)];
+  const mode = document.documentElement.getAttribute("data-color-mode") ?? "";
+  copy.style.setProperty("margin", "0 auto");
+  copy.style.setProperty("width", `${width}px`);
+  copy.style.setProperty("max-width", "none");
+  return [
+    "<!doctype html>",
+    `<html lang="en" data-coordination-still="1" data-color-mode="${escape(mode)}" data-width="${width}" data-height="${height}" data-title="${escape(title)}" data-taken="${(/* @__PURE__ */ new Date()).toISOString()}">`,
+    `<head><meta charset="utf-8"><title>Coordination: ${escape(title)}</title>`,
+    `<style>:root{${tokens.map(([name, value]) => `${name}:${value}`).join(";")}}html,body{margin:0;background:${backdrop(root)}}</style></head>`,
+    `<body>${copy.outerHTML}</body></html>`
+  ].join("\n");
+}
+
 // plugin/src/page.tsx
-function Frame({ children }) {
-  return /* @__PURE__ */ React.createElement("div", { style: { height: "100%", overflowY: "auto", boxSizing: "border-box" } }, /* @__PURE__ */ React.createElement("div", { style: { padding: t.inset, display: "flex", flexDirection: "column", gap: 16, width: "100%", maxWidth: 1180, margin: "0 auto", boxSizing: "border-box", color: t.text } }, children));
+function Frame({ children, content }) {
+  return /* @__PURE__ */ React.createElement("div", { style: { height: "100%", overflowY: "auto", boxSizing: "border-box" } }, /* @__PURE__ */ React.createElement("div", { ref: content, "data-coordination-page": "", style: { padding: t.inset, display: "flex", flexDirection: "column", gap: 16, width: "100%", maxWidth: 1180, margin: "0 auto", boxSizing: "border-box", color: t.text } }, children));
 }
 var chosen = {};
 function CoordinationPage({ relay }) {
@@ -545,6 +641,8 @@ function CoordinationPage({ relay }) {
   const [comparing, setComparing] = React.useState(chosen.comparing ?? false);
   const [anonymous, setAnonymous] = React.useState(chosen.anonymous ?? false);
   Object.assign(chosen, { a, b, comparing, anonymous });
+  const content = React.useRef(null);
+  const [copied, setCopied] = React.useState("");
   const has = (id) => !!id && channels.some((c) => c.id === id);
   const idA = has(a) ? a : channels[0]?.id;
   const idB = comparing ? has(b) && b !== idA ? b : channels.find((c) => c.id !== idA)?.id : void 0;
@@ -561,7 +659,16 @@ function CoordinationPage({ relay }) {
     left.refresh();
     right.refresh();
   };
-  return /* @__PURE__ */ React.createElement(Frame, null, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" } }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("h1", { style: { margin: 0 } }, "Coordination"), /* @__PURE__ */ React.createElement("p", { style: { margin: "2px 0 0", color: t.subtle } }, "How people and agents hand work to each other in a channel.")), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: t.gap, flexWrap: "wrap" } }, picker(idA, setA, "Channel"), comparing && /* @__PURE__ */ React.createElement("span", { style: { color: t.subtle } }, "and"), comparing && picker(idB, setB, "Channel to compare with", idA), channels.length > 1 && /* @__PURE__ */ React.createElement("button", { type: "button", "aria-pressed": comparing, onClick: () => setComparing(!comparing) }, comparing ? "Stop comparing" : "Compare"), /* @__PURE__ */ React.createElement("button", { type: "button", "aria-pressed": anonymous, title: "Show everyone by role and number, for a screenshot that names nobody", onClick: () => setAnonymous(!anonymous) }, anonymous ? "Show names" : "Hide names"), /* @__PURE__ */ React.createElement("button", { type: "button", onClick: refresh }, "Refresh"), /* @__PURE__ */ React.createElement("span", { style: { color: t.subtle, fontSize: 12, whiteSpace: "nowrap" }, title: "New messages are picked up as they arrive" }, left.live ? "\u25CF Live" : "", left.readAt ? ` \xB7 read ${clock(left.readAt / 1e3)}` : ""))), comparing && idB ? /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement(Compare, { left: { name: nameOf(idA), summary: leftMeasures?.summary }, right: { name: nameOf(idB), summary: rightMeasures?.summary } }), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 24, alignItems: "flex-start" } }, /* @__PURE__ */ React.createElement("div", { style: { flex: "1 1 420px", minWidth: 0 } }, /* @__PURE__ */ React.createElement(ChannelView, { name: nameOf(idA), state: left, colors, compact: true, anonymous })), /* @__PURE__ */ React.createElement("div", { style: { flex: "1 1 420px", minWidth: 0 } }, /* @__PURE__ */ React.createElement(ChannelView, { name: nameOf(idB), state: right, colors, compact: true, anonymous })))) : /* @__PURE__ */ React.createElement(ChannelView, { name: nameOf(idA), state: left, colors, anonymous }), /* @__PURE__ */ React.createElement("p", { style: { margin: 0, color: t.subtle, fontSize: 12 } }, "Counts come from message order and mentions only; nothing reads what a message says. This plugin reads the channel and never posts."));
+  const copy = () => {
+    if (!content.current) return;
+    const still = snapshot(content.current, comparing && idB ? `${nameOf(idA)} and ${nameOf(idB)}` : nameOf(idA));
+    const done = (word) => {
+      setCopied(word);
+      setTimeout(() => setCopied(""), 2500);
+    };
+    navigator.clipboard.writeText(still).then(() => done("Copied"), () => done("Could not copy"));
+  };
+  return /* @__PURE__ */ React.createElement(Frame, { content }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" } }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("h1", { style: { margin: 0 } }, "Coordination"), /* @__PURE__ */ React.createElement("p", { style: { margin: "2px 0 0", color: t.subtle } }, "How people and agents hand work to each other in a channel.")), /* @__PURE__ */ React.createElement("div", { "data-controls": "", style: { display: "flex", alignItems: "center", gap: t.gap, flexWrap: "wrap" } }, picker(idA, setA, "Channel"), comparing && /* @__PURE__ */ React.createElement("span", { style: { color: t.subtle } }, "and"), comparing && picker(idB, setB, "Channel to compare with", idA), channels.length > 1 && /* @__PURE__ */ React.createElement("button", { type: "button", "aria-pressed": comparing, onClick: () => setComparing(!comparing) }, comparing ? "Stop comparing" : "Compare"), /* @__PURE__ */ React.createElement("button", { type: "button", "aria-pressed": anonymous, title: "Show everyone by role and number, for a screenshot that names nobody", onClick: () => setAnonymous(!anonymous) }, anonymous ? "Show names" : "Hide names"), /* @__PURE__ */ React.createElement("button", { type: "button", title: "Put a still of this whole page on the clipboard, as one HTML file", onClick: copy }, copied || "Copy as HTML"), /* @__PURE__ */ React.createElement("button", { type: "button", onClick: refresh }, "Refresh"), /* @__PURE__ */ React.createElement("span", { style: { color: t.subtle, fontSize: 12, whiteSpace: "nowrap" }, title: "New messages are picked up as they arrive" }, left.live ? "\u25CF Live" : "", left.readAt ? ` \xB7 read ${clock(left.readAt / 1e3)}` : ""))), comparing && idB ? /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement(Compare, { left: { name: nameOf(idA), summary: leftMeasures?.summary }, right: { name: nameOf(idB), summary: rightMeasures?.summary } }), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 24, alignItems: "flex-start" } }, /* @__PURE__ */ React.createElement("div", { style: { flex: "1 1 420px", minWidth: 0 } }, /* @__PURE__ */ React.createElement(ChannelView, { name: nameOf(idA), state: left, colors, compact: true, anonymous })), /* @__PURE__ */ React.createElement("div", { style: { flex: "1 1 420px", minWidth: 0 } }, /* @__PURE__ */ React.createElement(ChannelView, { name: nameOf(idB), state: right, colors, compact: true, anonymous })))) : /* @__PURE__ */ React.createElement(ChannelView, { name: nameOf(idA), state: left, colors, anonymous }), /* @__PURE__ */ React.createElement("p", { style: { margin: 0, color: t.subtle, fontSize: 12 } }, "Counts come from message order and mentions only; nothing reads what a message says. This plugin reads the channel and never posts."));
 }
 
 // plugin/src/panel.tsx

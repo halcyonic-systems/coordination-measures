@@ -4,11 +4,13 @@
 //   ?mode=dark    dark colours
 //   ?compare=1    open with two channels side by side
 //   ?live=1       a new invented message every few seconds
+//   ?still=1      replace the page with its own still, as Copy as HTML would write it
 //   ?anon=1       names hidden: everyone shown by role and number
 //   ?channel=ID   open on one of the invented channels (demo-flat, demo-study, demo-quiet, demo-empty)
 import * as React from 'react'
 import { createRoot } from 'react-dom/client'
 import { apply } from '../src/index.tsx'
+import { snapshot } from '../src/snapshot.ts'
 import { another, CHANNELS, MESSAGES, PROFILES } from './demo.ts'
 
 const params = new URLSearchParams(location.search)
@@ -77,4 +79,13 @@ if (params.get('channel')) {
     select.dispatchEvent(new Event('change', { bubbles: true }))
   }
   requestAnimationFrame(choose)
+}
+if (params.get('still')) {
+  setTimeout(() => {
+    const page = document.querySelector<HTMLElement>('[data-coordination-page]')!
+    const still = snapshot(page, 'preview')
+    document.open()
+    document.write(still)
+    document.close()
+  }, 1500)
 }

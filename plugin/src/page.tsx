@@ -5,13 +5,14 @@ import { Compare } from './compare.tsx'
 import { useChannelData, useChannels, useSession } from './hooks.ts'
 import { Quiet } from './parts.tsx'
 import type { Relay } from './read.ts'
+import { snapshot } from './snapshot.ts'
 import { clock, t, useRoleColors } from './theme.ts'
 
 /** The page scrolls itself: Buzz gives a page its area and leaves padding and scrolling to it. */
-function Frame({ children }: { children: React.ReactNode }) {
+function Frame({ children, content }: { children: React.ReactNode; content?: React.RefObject<HTMLDivElement> }) {
   return (
     <div style={{ height: '100%', overflowY: 'auto', boxSizing: 'border-box' }}>
-      <div style={{ padding: t.inset, display: 'flex', flexDirection: 'column', gap: 16, width: '100%', maxWidth: 1180, margin: '0 auto', boxSizing: 'border-box', color: t.text }}>{children}</div>
+      <div ref={content} data-coordination-page="" style={{ padding: t.inset, display: 'flex', flexDirection: 'column', gap: 16, width: '100%', maxWidth: 1180, margin: '0 auto', boxSizing: 'border-box', color: t.text }}>{children}</div>
     </div>
   )
 }
@@ -28,6 +29,8 @@ export function CoordinationPage({ relay }: { relay: Relay }) {
   const [comparing, setComparing] = React.useState(chosen.comparing ?? false)
   const [anonymous, setAnonymous] = React.useState(chosen.anonymous ?? false)
   Object.assign(chosen, { a, b, comparing, anonymous })
+  const content = React.useRef<HTMLDivElement>(null)
+  const [copied, setCopied] = React.useState<'' | 'Copied' | 'Could not copy'>('')
 
   // Fall back to the first channel when nothing is chosen or the choice is gone.
   const has = (id?: string) => !!id && channels.some((c) => c.id === id)
@@ -53,15 +56,25 @@ export function CoordinationPage({ relay }: { relay: Relay }) {
     left.refresh()
     right.refresh()
   }
+  // The whole page as one HTML file on the clipboard: the only thing this plugin ever writes.
+  const copy = () => {
+    if (!content.current) return
+    const still = snapshot(content.current, comparing && idB ? `${nameOf(idA)} and ${nameOf(idB)}` : nameOf(idA))
+    const done = (word: 'Copied' | 'Could not copy') => {
+      setCopied(word)
+      setTimeout(() => setCopied(''), 2500)
+    }
+    navigator.clipboard.writeText(still).then(() => done('Copied'), () => done('Could not copy'))
+  }
 
   return (
-    <Frame>
+    <Frame content={content}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
         <div>
           <h1 style={{ margin: 0 }}>Coordination</h1>
           <p style={{ margin: '2px 0 0', color: t.subtle }}>How people and agents hand work to each other in a channel.</p>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: t.gap, flexWrap: 'wrap' }}>
+        <div data-controls="" style={{ display: 'flex', alignItems: 'center', gap: t.gap, flexWrap: 'wrap' }}>
           {picker(idA, setA, 'Channel')}
           {comparing && <span style={{ color: t.subtle }}>and</span>}
           {comparing && picker(idB, setB, 'Channel to compare with', idA)}
@@ -73,6 +86,7 @@ export function CoordinationPage({ relay }: { relay: Relay }) {
           <button type="button" aria-pressed={anonymous} title="Show everyone by role and number, for a screenshot that names nobody" onClick={() => setAnonymous(!anonymous)}>
             {anonymous ? 'Show names' : 'Hide names'}
           </button>
+          <button type="button" title="Put a still of this whole page on the clipboard, as one HTML file" onClick={copy}>{copied || 'Copy as HTML'}</button>
           <button type="button" onClick={refresh}>Refresh</button>
           <span style={{ color: t.subtle, fontSize: 12, whiteSpace: 'nowrap' }} title="New messages are picked up as they arrive">
             {left.live ? '● Live' : ''}{left.readAt ? ` · read ${clock(left.readAt / 1000)}` : ''}
