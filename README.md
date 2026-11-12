@@ -18,12 +18,12 @@ Put two channels side by side and the same definitions apply to both, so a diffe
 
 ## Use it in your community
 
-1. In Buzz, open **Settings → Plugins → Manage plugins → Add**. Add from a folder with **Browse** and pick `plugin/dist`, or add from Git with this repository.
+1. In Buzz, open **Settings → Plugins → Manage plugins → Add**, choose **Browse** under Add from folder and pick `plugin/dist`.
 2. Review the access shown (the plugin asks for none) and choose **Install plugin**.
 3. Open **Coordination** from the app's navigation and choose a channel you have joined. **Compare** sets two side by side.
 4. In any channel, the **Coordination** button in the channel header measures that channel in a side panel.
-5. **Hide names** shows everyone by role and number (Human 1, Agent 2), for a screenshot that names nobody.
-6. **Copy as HTML** puts a still of the whole page on your clipboard: one HTML file with no scripts, as it looked in Buzz. In this repository, `npm run capture` then saves it and one image of the page at full height to `captures/` (ignored by git; needs macOS and Chrome). An agent can read the file to see what you saw.
+
+**Hide names** shows everyone by role and number, and **Copy as HTML** puts a still of the whole page on your clipboard. The guide inside the app covers both ([plugin/README.md](plugin/README.md)).
 
 It reads your joined channels through the app and updates as messages arrive. It never posts, reacts or signs. The one thing it writes is your clipboard, when you press Copy as HTML.
 
@@ -40,34 +40,9 @@ It reads your joined channels through the app and updates as messages arrive. It
 
 Exact definitions, defaults and limits: [METRICS.md](METRICS.md).
 
-## Layout
-
-| Path | What | Knows Buzz? |
-|---|---|---|
-| `src/core/` | The measures and views, pure functions of messages and roles | No |
-| `src/cli.ts` | Runs the core on a JSON file (fixtures, exported timelines) | No |
-| `test/`, `fixtures/` | Known answers for every measure, worked by hand | No |
-| `plugin/src/` | The page and channel panel. `read.ts` and `adapter.ts` are the only files that touch Buzz's session and event shapes | Yes |
-| `plugin/dist/` | The built plugin Buzz installs: `manifest.json`, `plugin.js`, its guide and icon | |
-| `plugin/preview/` | A browser preview with a stand-in host and invented channels | No |
-| `tools/capture.mjs` | Saves a still copied from the plugin, and one image of it | No |
-| `analyst/charter.md` | The agent that labels failures against the MAST taxonomy | Runs in Buzz |
-
-One computation everywhere: the tests, the command line and the plugin all call the same core, so a number on the page is a number the tests cover.
-
 ## Develop
 
-```sh
-npm install                               # dev tools only
-npm test                                  # known answers
-npm run typecheck
-npm run measure -- fixtures/loop.json     # the summary for a file
-npm run plugin:build                      # bundle to plugin/dist, then the rule check
-npm run preview                           # the interface in a browser: http://127.0.0.1:4418/
-npm run capture                           # the still on the clipboard, to captures/ as HTML and one image
-```
-
-The preview takes `?compare=1`, `?mode=dark`, `?view=panel`, `?live=1`, `?anon=1`, `?channel=demo-flat` and `?still=1`. After a rebuild, an installed copy changes when you choose **Update** in Settings → Plugins. Commit `plugin/dist` with the source that built it.
+`npm install`, `npm test`, then `npm run preview` to see the interface in a browser with invented channels. The layout, the rules for changes and the other commands are in [AGENTS.md](AGENTS.md), written for people and agents alike.
 
 ## Rules
 
@@ -87,7 +62,9 @@ Buzz plugins run as unsandboxed code inside the app, and the session a plugin re
 ## State (2026-11-12)
 
 - Core: 16 tests pass. Plugin: builds and passes its check; planted writes fail it.
-- Runs in Buzz (2026-11-10, a 0.7.0 preview build): the page lists joined channels, reads a live channel, shows names, recognises an agent from its profile and counts human to agent handoffs. A channel of two people and four agents has been read too (40 messages, 66 handoffs, every pairing present). Copy as HTML works there too. Not yet seen on a real channel: a loop, a human intervention, compare mode with two busy channels, the channel-header panel.
+- Seen working in Buzz: the page, a channel of two people and four agents (40 messages, 66 handoffs, every pairing present), Hide names and Copy as HTML.
+- Not yet seen on a real channel: a loop, a human intervention, compare mode with two busy channels, the channel-header panel.
+- Not yet tried: adding the plugin from Git with this repository.
 
 ## License
 
