@@ -16,6 +16,7 @@ Code counts; nothing reads what a message says. A separate agent, the analyst, l
 2. Review the access shown (the plugin asks for none) and choose **Install plugin**.
 3. Open **Coordination** from the app's navigation and choose a channel you have joined. **Compare** sets two side by side.
 4. In any channel, the **Coordination** button in the channel header measures that channel in a side panel.
+5. **Hide names** shows everyone by role and number (Human 1, Agent 2), for a screenshot that names nobody.
 
 It reads your joined channels through the app and updates as messages arrive. It never posts, reacts or signs.
 
@@ -57,7 +58,7 @@ npm run plugin:build                      # bundle to plugin/dist, then the rule
 npm run preview                           # the interface in a browser: http://127.0.0.1:4418/
 ```
 
-The preview takes `?compare=1`, `?mode=dark`, `?view=panel` and `?live=1`. After a rebuild, an installed copy changes when you choose **Update** in Settings → Plugins. Commit `plugin/dist` with the source that built it.
+The preview takes `?compare=1`, `?mode=dark`, `?view=panel`, `?live=1`, `?anon=1` and `?channel=demo-flat`. After a rebuild, an installed copy changes when you choose **Update** in Settings → Plugins. Commit `plugin/dist` with the source that built it.
 
 ## Rules
 
@@ -74,10 +75,10 @@ Buzz plugins run as unsandboxed code inside the app, and the session a plugin re
 - **The analyst.** An agent that labels agent failures against MAST's 14 modes, kept independent of the counts so their agreement means something.
 - **Verified roles.** Check the owner attestation's signature instead of reading it as a hint.
 
-## State (2026-11-10)
+## State (2026-11-12)
 
-- Core: 14 tests pass. Plugin: builds and passes its check; planted writes fail it.
-- Runs in Buzz (2026-11-10, a 0.7.0 preview build): the page lists joined channels, reads a live channel, shows names, recognises an agent from its profile and counts human to agent handoffs. Not yet seen on a real channel: agent to agent handoffs, a loop, compare mode with two busy channels, the channel-header panel.
+- Core: 16 tests pass. Plugin: builds and passes its check; planted writes fail it.
+- Runs in Buzz (2026-11-10, a 0.7.0 preview build): the page lists joined channels, reads a live channel, shows names, recognises an agent from its profile and counts human to agent handoffs. A channel of two people and five agents has been read too (40 messages, 66 handoffs, every pairing present). Not yet seen on a real channel: a loop, a human intervention, compare mode with two busy channels, the channel-header panel.
 
 ## License
 

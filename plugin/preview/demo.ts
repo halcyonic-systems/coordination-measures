@@ -56,6 +56,7 @@ export const CHANNELS = [
   { id: 'demo-coordinated', name: 'agents-with-coordinator', channelType: 'stream' },
   { id: 'demo-flat', name: 'agents-without-coordinator', channelType: 'stream' },
   { id: 'demo-study', name: 'coordination-study', channelType: 'stream' },
+  { id: 'demo-quiet', name: 'first-message', channelType: 'stream' },
   { id: 'demo-empty', name: 'new-channel', channelType: 'stream' },
 ] as const
 
@@ -63,6 +64,7 @@ export const MESSAGES: Record<string, NostrEvent[]> = {
   'demo-coordinated': channel('demo-coordinated', START, coordinated, 7),
   'demo-flat': channel('demo-flat', START, flat, 11),
   'demo-study': channel('demo-study', START + 3600, study, 3),
+  'demo-quiet': channel('demo-quiet', START + 7200, [[ana]], 5),
   'demo-empty': [],
 }
 

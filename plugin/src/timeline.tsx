@@ -2,7 +2,7 @@
 // handoff, a band where agents looped, a ring where a human stepped in.
 import { React } from './host.ts'
 import { Quiet } from './parts.tsx'
-import { clock, hexagon, t, useWidth } from './theme.ts'
+import { clock, day, hexagon, t, useWidth } from './theme.ts'
 import type { Beat, Handoff, Role } from '../../src/core/index.ts'
 
 const LANE = 26
@@ -24,13 +24,19 @@ export function Timeline({ beats, handoffs, names, colors }: { beats: readonly B
   const counts = new Map<string, number>()
   for (const b of shown) counts.set(b.author, (counts.get(b.author) ?? 0) + 1)
   const ranked = [...counts.entries()].sort((a, b) => b[1] - a[1]).map(([id]) => id)
-  const lanes = ranked.length > MAX_LANES ? [...ranked.slice(0, MAX_LANES - 1), OTHERS] : ranked
-  const laneOf = (author: string) => Math.max(0, lanes.indexOf(lanes.includes(author) ? author : OTHERS))
   const roleOfLane = new Map(shown.map((b) => [b.author, b.role] as const))
+  // The busiest get a lane each, humans above agents; the rest share one at the bottom.
+  const kept = ranked.length > MAX_LANES ? ranked.slice(0, MAX_LANES - 1) : ranked
+  const byRole = (role: Role) => kept.filter((id) => roleOfLane.get(id) === role)
+  const lanes = [...byRole('human'), ...byRole('agent'), ...(ranked.length > MAX_LANES ? [OTHERS] : [])]
+  const laneOf = (author: string) => Math.max(0, lanes.indexOf(lanes.includes(author) ? author : OTHERS))
 
   const x = (i: number) => GUTTER + i * step
   const y = (lane: number) => TOP + lane * LANE + LANE / 2
-  const height = TOP + lanes.length * LANE + 6
+  const height = TOP + lanes.length * LANE + 22
+  // The axis is message order, so only its two ends carry a time.
+  const [first, last] = [shown[0], shown[shown.length - 1]]
+  const when = (at: number) => (day(first.at) === day(last.at) ? clock(at) : day(at))
   const index = new Map(shown.map((b, i) => [b.id, i] as const))
 
   // Stretches of consecutive loop messages, as [first, last] positions.
@@ -63,6 +69,8 @@ export function Timeline({ beats, handoffs, names, colors }: { beats: readonly B
               </text>
             </g>
           ))}
+          <text x={GUTTER} y={height - 4} fontSize={11} fill={t.subtle}>{when(first.at)}</text>
+          {shown.length > 1 && when(last.at) !== when(first.at) && <text x={x(shown.length - 1)} y={height - 4} textAnchor="end" fontSize={11} fill={t.subtle}>{when(last.at)}</text>}
           {handoffs.map((h) => {
             const from = index.get(h.id)
             const to = h.answeredBy ? index.get(h.answeredBy) : undefined
@@ -87,7 +95,7 @@ export function Timeline({ beats, handoffs, names, colors }: { beats: readonly B
         </svg>
       )}
       <p style={{ margin: '8px 0 0', color: t.subtle, fontSize: 12 }}>
-        {shown.length < beats.length ? `The latest ${shown.length} of ${beats.length} messages` : `All ${beats.length} messages`}, oldest on the left. A line joins a mention to its answer. Shaded: two agents going back and forth. Hollow: a handoff nobody answered. Ringed: a human stepping in unasked.
+        {shown.length < beats.length ? `The latest ${shown.length} of ${beats.length} messages` : beats.length === 1 ? 'The one message so far' : `All ${beats.length} messages`}, in order from the left, evenly spaced whatever the time between them. A line joins a mention to its answer. Shaded: two agents going back and forth. Hollow: a handoff nobody answered. Ringed: a human stepping in unasked.
       </p>
     </div>
   )

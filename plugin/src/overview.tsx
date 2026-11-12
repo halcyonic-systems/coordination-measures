@@ -1,13 +1,18 @@
 // The headline figures for one channel, and the 2 by 2 of who hands off to whom.
 import { React } from './host.ts'
 import { RoleMark, Tile } from './parts.tsx'
-import { duration, numeric, percent, plural, t } from './theme.ts'
+import { duration, numeric, percent, plural, t, useWidth } from './theme.ts'
 import type { Role, Summary } from '../../src/core/index.ts'
 
 export function Tiles({ summary: s, colors }: { summary: Summary; colors: Record<Role, string> }) {
   const { human, agent, total } = s.messages
+  // Four across, two by two, or a single column: never a row with one tile left over.
+  const [ref, width] = useWidth()
+  const columns = width >= 620 ? 4 : width >= 300 || !width ? 2 : 1
+  // A flex row keeps a mark beside its count whatever the host's styles make of an inline svg.
+  const count: React.CSSProperties = { display: 'inline-flex', alignItems: 'center', gap: 4, whiteSpace: 'nowrap' }
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: t.gap }}>
+    <div ref={ref} style={{ display: 'grid', gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))`, gap: t.gap }}>
       <Tile label="Messages" value={String(total)}>
         {total > 0 && (
           <span title={`${human} from humans, ${agent} from agents`}>
@@ -16,21 +21,25 @@ export function Tiles({ summary: s, colors }: { summary: Summary; colors: Record
               {human > 0 && <span style={{ flex: human, background: colors.human, borderRadius: 3 }} />}
               {agent > 0 && <span style={{ flex: agent, background: colors.agent, borderRadius: 3 }} />}
             </span>
-            <span style={{ display: 'inline-flex', gap: 10, flexWrap: 'wrap' }}>
-              <span><RoleMark role="human" color={colors.human} size={10} /> {human} human</span>
-              <span><RoleMark role="agent" color={colors.agent} size={10} /> {agent} agent</span>
+            <span style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+              <span style={count}><RoleMark role="human" color={colors.human} size={10} /> {human} human</span>
+              <span style={count}><RoleMark role="agent" color={colors.agent} size={10} /> {agent} agent</span>
             </span>
           </span>
         )}
       </Tile>
-      <Tile label="Handoffs answered" value={percent(s.allHandoffs.answered, s.allHandoffs.total)}>
-        {s.allHandoffs.total ? `${s.allHandoffs.answered} of ${plural(s.allHandoffs.total, 'handoff')}` : 'No one has mentioned anyone yet'}
-      </Tile>
-      <Tile label="Median reply" value={duration(s.allHandoffs.medianLatency)}>
-        from a mention to the answer
-      </Tile>
+      {s.allHandoffs.total ? (
+        <Tile label="Handoffs answered" value={percent(s.allHandoffs.answered, s.allHandoffs.total)}>
+          {s.allHandoffs.answered} of {plural(s.allHandoffs.total, 'handoff')}
+          {s.allHandoffs.medianLatency !== null && ` · median reply ${duration(s.allHandoffs.medianLatency)}`}
+        </Tile>
+      ) : (
+        <Tile label="Handoffs" value="0">
+          a handoff is a message that mentions someone
+        </Tile>
+      )}
       <Tile label="Agent loops" value={String(s.loops)}>
-        two agents back and forth, {s.options.loopLength}+ messages · longest agent run {s.longestAgentRun}
+        {s.options.loopLength}+ messages back and forth · longest agent run {s.longestAgentRun}
       </Tile>
       <Tile label="Human interventions" value={String(s.interventions)}>
         a human stepping into an agent run unasked

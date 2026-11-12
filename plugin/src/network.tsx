@@ -12,23 +12,30 @@ const MAX_NODES = 12
 export function Network({ people, edges, names, colors }: { people: readonly Participant[]; edges: readonly Edge[]; names: (id: string) => string; colors: Record<Role, string> }) {
   const [focus, setFocus] = React.useState<string | null>(null)
   const linked = new Set(edges.flatMap((e) => [e.from, e.to]))
-  const shown = people.filter((p) => linked.has(p.id)).slice(0, MAX_NODES)
+  const busiest = people.filter((p) => linked.has(p.id)).slice(0, MAX_NODES)
+  // Humans together, then agents, each still busiest first.
+  const shown = [...busiest.filter((p) => p.role === 'human'), ...busiest.filter((p) => p.role === 'agent')]
   if (!shown.length) return <Quiet>No handoffs yet. A handoff is a message that mentions someone.</Quiet>
 
   const cx = W / 2
   const cy = H / 2 - 6
-  const ring = shown.length === 1 ? 0 : Math.min(cx - 86, cy - 44)
+  const n = shown.length
+  const humans = shown.filter((p) => p.role === 'human').length
+  const ring = n === 1 ? 0 : Math.min(cx - 86, cy - 44)
   const most = Math.max(...shown.map((p) => p.messages), 1)
+  // Humans sit on the left of the ring and agents on the right, like the table beside it;
+  // a channel of one role alone starts from the top.
+  const start = n === 2 || (humans > 0 && humans < n) ? Math.PI - (Math.PI * (humans - 1)) / n : -Math.PI / 2
   const at = new Map(
     shown.map((p, i) => {
-      // Two people sit side by side; more go round a ring from the top.
-      const a = (2 * Math.PI * i) / shown.length + (shown.length === 2 ? Math.PI : -Math.PI / 2)
+      const a = start + (2 * Math.PI * i) / n
       return [p.id, { x: cx + ring * Math.cos(a), y: cy + ring * Math.sin(a), r: 9 + 9 * Math.sqrt(p.messages / most), a, p }] as const
     }),
   )
   const drawn = edges.filter((e) => at.has(e.from) && at.has(e.to))
   const heaviest = Math.max(...drawn.map((e) => e.handoffs), 1)
   const dim = (ids: string[]) => (focus && !ids.includes(focus) ? 0.15 : 1)
+  const f = (v: number) => v.toFixed(1)
 
   return (
     <div>
@@ -36,38 +43,35 @@ export function Network({ people, edges, names, colors }: { people: readonly Par
         {drawn.map((e) => {
           const a = at.get(e.from)!
           const b = at.get(e.to)!
-          const dx = b.x - a.x
-          const dy = b.y - a.y
-          const len = Math.hypot(dx, dy) || 1
-          // Start and end on the marks' edges, and bow to one side so the two directions stay apart.
-          const [ux, uy] = [dx / len, dy / len]
-          const [sx, sy] = [a.x + ux * (a.r + 3), a.y + uy * (a.r + 3)]
-          const [ex, ey] = [b.x - ux * (b.r + 7), b.y - uy * (b.r + 7)]
-          const bow = Math.min(34, len * 0.18)
-          const [mx, my] = [(sx + ex) / 2 - uy * bow, (sy + ey) / 2 + ux * bow]
+          const len = Math.hypot(b.x - a.x, b.y - a.y) || 1
+          const [ux, uy] = [(b.x - a.x) / len, (b.y - a.y) / len]
+          // The curve bows to one side, and leaves and arrives on that side of each mark, so the
+          // two directions between a pair never share a point.
+          const bow = Math.min(40, len * 0.22)
+          const [mx, my] = [(a.x + b.x) / 2 - uy * bow, (a.y + b.y) / 2 + ux * bow]
+          const toward = (p: { x: number; y: number }) => {
+            const d = Math.hypot(mx - p.x, my - p.y) || 1
+            return [(mx - p.x) / d, (my - p.y) / d]
+          }
+          const [ax, ay] = toward(a)
+          const [bx, by] = toward(b)
           const role = a.p.role
           // One more handoff, a little thicker; past a handful, scaled to the busiest pair.
           const width = heaviest <= 7 ? 1.5 + 0.75 * (e.handoffs - 1) : 1.5 + (4.5 * (e.handoffs - 1)) / (heaviest - 1)
-          // The arrowhead, drawn along the curve's direction where it arrives.
-          const [tx, ty] = [ex - mx, ey - my]
-          const tl = Math.hypot(tx, ty) || 1
-          const [vx, vy] = [tx / tl, ty / tl]
-          const head = 5 + width * 1.4
-          const tip = [ex + vx * 3, ey + vy * 3]
-          const base = [tip[0] - vx * head, tip[1] - vy * head]
+          const head = 4 + width * 1.2
           const wing = head * 0.5
-          const points = [tip, [base[0] - vy * wing, base[1] + vx * wing], [base[0] + vy * wing, base[1] - vx * wing]].map((q) => q.map((n) => n.toFixed(1)).join(',')).join(' ')
+          const [sx, sy] = [a.x + ax * (a.r + 3), a.y + ay * (a.r + 3)]
+          const tip = [b.x + bx * (b.r + 3), b.y + by * (b.r + 3)]
+          const base = [tip[0] + bx * head, tip[1] + by * head]
+          const points = [tip, [base[0] - by * wing, base[1] + bx * wing], [base[0] + by * wing, base[1] - bx * wing]].map((q) => q.map(f).join(',')).join(' ')
+          const d = `M${f(sx)},${f(sy)} Q${f(mx)},${f(my)} ${f(base[0] - bx * head * 0.3)},${f(base[1] - by * head * 0.3)}`
+          const share = e.answered / e.handoffs
           return (
-            <g key={`${e.from}>${e.to}`} opacity={0.8 * dim([e.from, e.to])}>
-              <path
-                d={`M${sx.toFixed(1)},${sy.toFixed(1)} Q${mx.toFixed(1)},${my.toFixed(1)} ${(ex - vx * head * 0.6).toFixed(1)},${(ey - vy * head * 0.6).toFixed(1)}`}
-                fill="none"
-                stroke={colors[role]}
-                strokeWidth={width}
-                strokeLinecap="round"
-                strokeDasharray={e.answered === 0 ? `1 ${(width + 3).toFixed(1)}` : undefined}
-              />
-              <polygon points={points} fill={colors[role]} />
+            <g key={`${e.from}>${e.to}`} opacity={dim([e.from, e.to])}>
+              {/* Share answered, as in the table: the solid part on a lighter track of the same hue. */}
+              <path d={d} fill="none" stroke={colors[role]} strokeWidth={width} strokeLinecap="round" opacity={0.28} />
+              {share > 0 && <path d={d} fill="none" stroke={colors[role]} strokeWidth={width} strokeLinecap={share < 1 ? 'butt' : 'round'} pathLength={100} strokeDasharray={share < 1 ? `${f(share * 100)} 100` : undefined} opacity={0.85} />}
+              <polygon points={points} fill={colors[role]} opacity={share === 1 ? 0.85 : 0.4} />
               <title>{`${names(e.from)} to ${names(e.to)}: ${plural(e.handoffs, 'handoff')}, ${e.answered} answered`}</title>
             </g>
           )
@@ -90,8 +94,8 @@ export function Network({ people, edges, names, colors }: { people: readonly Par
         })}
       </svg>
       <p style={{ margin: '8px 0 0', color: t.subtle, fontSize: 12 }}>
-        An arrow points from the person mentioning to the person mentioned; thicker means more handoffs, dotted means none were answered. A mark grows with messages.
-        {people.filter((p) => linked.has(p.id)).length > MAX_NODES && ` Showing the ${MAX_NODES} most active.`}
+        An arrow points from the person mentioning to the person mentioned. Thicker means more handoffs; the solid part is the share answered. A mark grows with messages.
+        {busiest.length < people.filter((p) => linked.has(p.id)).length && ` Showing the ${MAX_NODES} most active.`}
       </p>
     </div>
   )

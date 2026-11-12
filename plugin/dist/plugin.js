@@ -4,48 +4,6 @@ var setReact = (r) => {
   React = r;
 };
 
-// plugin/src/adapter.ts
-var MESSAGE_KIND = 9;
-var PROFILE_KIND = 0;
-function toMessage(e) {
-  const mentions = [...new Set(e.tags.filter((t2) => t2[0] === "p" && t2[1] && t2[1] !== e.pubkey).map((t2) => t2[1]))];
-  const root = e.tags.find((t2) => t2[0] === "e" && t2[1])?.[1];
-  return { id: e.id, author: e.pubkey, at: e.created_at, mentions, ...root ? { root } : {} };
-}
-function newest(profiles) {
-  const out = /* @__PURE__ */ new Map();
-  for (const p of profiles) {
-    const seen = out.get(p.pubkey);
-    if (!seen || p.created_at > seen.created_at) out.set(p.pubkey, p);
-  }
-  return out;
-}
-var profileContent = (p) => {
-  try {
-    const v = JSON.parse(p.content);
-    return v && typeof v === "object" ? v : {};
-  } catch {
-    return {};
-  }
-};
-function toRoster(profiles) {
-  const roster = {};
-  for (const [pubkey, p] of newest(profiles)) {
-    if (p.tags.some((t2) => t2[0] === "auth") || profileContent(p).bot === true) roster[pubkey] = "agent";
-  }
-  return roster;
-}
-function toNames(profiles) {
-  const names = {};
-  for (const [pubkey, p] of newest(profiles)) {
-    const c = profileContent(p);
-    const name = [c.display_name, c.name].find((v) => typeof v === "string" && v.trim());
-    if (typeof name === "string") names[pubkey] = name.trim().slice(0, 40);
-  }
-  return names;
-}
-var shortKey = (pubkey) => pubkey.length > 12 ? `${pubkey.slice(0, 6)}\u2026${pubkey.slice(-4)}` : pubkey;
-
 // plugin/src/theme.ts
 var t = {
   text: "var(--text-standard, #2e3440)",
@@ -130,64 +88,64 @@ var MAX_NODES = 12;
 function Network({ people, edges: edges2, names, colors }) {
   const [focus, setFocus] = React.useState(null);
   const linked = new Set(edges2.flatMap((e) => [e.from, e.to]));
-  const shown = people.filter((p) => linked.has(p.id)).slice(0, MAX_NODES);
+  const busiest = people.filter((p) => linked.has(p.id)).slice(0, MAX_NODES);
+  const shown = [...busiest.filter((p) => p.role === "human"), ...busiest.filter((p) => p.role === "agent")];
   if (!shown.length) return /* @__PURE__ */ React.createElement(Quiet, null, "No handoffs yet. A handoff is a message that mentions someone.");
   const cx = W / 2;
   const cy = H / 2 - 6;
-  const ring = shown.length === 1 ? 0 : Math.min(cx - 86, cy - 44);
+  const n = shown.length;
+  const humans = shown.filter((p) => p.role === "human").length;
+  const ring = n === 1 ? 0 : Math.min(cx - 86, cy - 44);
   const most = Math.max(...shown.map((p) => p.messages), 1);
+  const start = n === 2 || humans > 0 && humans < n ? Math.PI - Math.PI * (humans - 1) / n : -Math.PI / 2;
   const at = new Map(
     shown.map((p, i) => {
-      const a = 2 * Math.PI * i / shown.length + (shown.length === 2 ? Math.PI : -Math.PI / 2);
+      const a = start + 2 * Math.PI * i / n;
       return [p.id, { x: cx + ring * Math.cos(a), y: cy + ring * Math.sin(a), r: 9 + 9 * Math.sqrt(p.messages / most), a, p }];
     })
   );
   const drawn = edges2.filter((e) => at.has(e.from) && at.has(e.to));
   const heaviest = Math.max(...drawn.map((e) => e.handoffs), 1);
   const dim = (ids) => focus && !ids.includes(focus) ? 0.15 : 1;
+  const f = (v) => v.toFixed(1);
   return /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("svg", { viewBox: `0 0 ${W} ${H}`, role: "img", "aria-label": "Who hands off to whom", style: { width: "100%", maxWidth: 560, height: "auto", display: "block", margin: "0 auto" } }, drawn.map((e) => {
     const a = at.get(e.from);
     const b = at.get(e.to);
-    const dx = b.x - a.x;
-    const dy = b.y - a.y;
-    const len = Math.hypot(dx, dy) || 1;
-    const [ux, uy] = [dx / len, dy / len];
-    const [sx, sy] = [a.x + ux * (a.r + 3), a.y + uy * (a.r + 3)];
-    const [ex, ey] = [b.x - ux * (b.r + 7), b.y - uy * (b.r + 7)];
-    const bow = Math.min(34, len * 0.18);
-    const [mx, my] = [(sx + ex) / 2 - uy * bow, (sy + ey) / 2 + ux * bow];
+    const len = Math.hypot(b.x - a.x, b.y - a.y) || 1;
+    const [ux, uy] = [(b.x - a.x) / len, (b.y - a.y) / len];
+    const bow = Math.min(40, len * 0.22);
+    const [mx, my] = [(a.x + b.x) / 2 - uy * bow, (a.y + b.y) / 2 + ux * bow];
+    const toward = (p) => {
+      const d2 = Math.hypot(mx - p.x, my - p.y) || 1;
+      return [(mx - p.x) / d2, (my - p.y) / d2];
+    };
+    const [ax, ay] = toward(a);
+    const [bx, by] = toward(b);
     const role = a.p.role;
     const width = heaviest <= 7 ? 1.5 + 0.75 * (e.handoffs - 1) : 1.5 + 4.5 * (e.handoffs - 1) / (heaviest - 1);
-    const [tx, ty] = [ex - mx, ey - my];
-    const tl = Math.hypot(tx, ty) || 1;
-    const [vx, vy] = [tx / tl, ty / tl];
-    const head = 5 + width * 1.4;
-    const tip = [ex + vx * 3, ey + vy * 3];
-    const base = [tip[0] - vx * head, tip[1] - vy * head];
+    const head = 4 + width * 1.2;
     const wing = head * 0.5;
-    const points = [tip, [base[0] - vy * wing, base[1] + vx * wing], [base[0] + vy * wing, base[1] - vx * wing]].map((q) => q.map((n) => n.toFixed(1)).join(",")).join(" ");
-    return /* @__PURE__ */ React.createElement("g", { key: `${e.from}>${e.to}`, opacity: 0.8 * dim([e.from, e.to]) }, /* @__PURE__ */ React.createElement(
-      "path",
-      {
-        d: `M${sx.toFixed(1)},${sy.toFixed(1)} Q${mx.toFixed(1)},${my.toFixed(1)} ${(ex - vx * head * 0.6).toFixed(1)},${(ey - vy * head * 0.6).toFixed(1)}`,
-        fill: "none",
-        stroke: colors[role],
-        strokeWidth: width,
-        strokeLinecap: "round",
-        strokeDasharray: e.answered === 0 ? `1 ${(width + 3).toFixed(1)}` : void 0
-      }
-    ), /* @__PURE__ */ React.createElement("polygon", { points, fill: colors[role] }), /* @__PURE__ */ React.createElement("title", null, `${names(e.from)} to ${names(e.to)}: ${plural(e.handoffs, "handoff")}, ${e.answered} answered`));
+    const [sx, sy] = [a.x + ax * (a.r + 3), a.y + ay * (a.r + 3)];
+    const tip = [b.x + bx * (b.r + 3), b.y + by * (b.r + 3)];
+    const base = [tip[0] + bx * head, tip[1] + by * head];
+    const points = [tip, [base[0] - by * wing, base[1] + bx * wing], [base[0] + by * wing, base[1] - bx * wing]].map((q) => q.map(f).join(",")).join(" ");
+    const d = `M${f(sx)},${f(sy)} Q${f(mx)},${f(my)} ${f(base[0] - bx * head * 0.3)},${f(base[1] - by * head * 0.3)}`;
+    const share = e.answered / e.handoffs;
+    return /* @__PURE__ */ React.createElement("g", { key: `${e.from}>${e.to}`, opacity: dim([e.from, e.to]) }, /* @__PURE__ */ React.createElement("path", { d, fill: "none", stroke: colors[role], strokeWidth: width, strokeLinecap: "round", opacity: 0.28 }), share > 0 && /* @__PURE__ */ React.createElement("path", { d, fill: "none", stroke: colors[role], strokeWidth: width, strokeLinecap: share < 1 ? "butt" : "round", pathLength: 100, strokeDasharray: share < 1 ? `${f(share * 100)} 100` : void 0, opacity: 0.85 }), /* @__PURE__ */ React.createElement("polygon", { points, fill: colors[role], opacity: share === 1 ? 0.85 : 0.4 }), /* @__PURE__ */ React.createElement("title", null, `${names(e.from)} to ${names(e.to)}: ${plural(e.handoffs, "handoff")}, ${e.answered} answered`));
   }), [...at.values()].map(({ x, y, r, a, p }) => {
     const out = shown.length === 1 ? { x, y: y + r + 16, anchor: "middle" } : { x: x + Math.cos(a) * (r + 8), y: y + Math.sin(a) * (r + 8) + 4, anchor: Math.cos(a) > 0.3 ? "start" : Math.cos(a) < -0.3 ? "end" : "middle" };
     const label = names(p.id);
     return /* @__PURE__ */ React.createElement("g", { key: p.id, opacity: dim([p.id, ...drawn.filter((e) => e.from === p.id || e.to === p.id).flatMap((e) => [e.from, e.to])]), onMouseEnter: () => setFocus(p.id), onMouseLeave: () => setFocus(null), style: { cursor: "default" } }, p.role === "agent" ? /* @__PURE__ */ React.createElement("polygon", { points: hexagon(x, y, r + 1), fill: colors.agent, stroke: t.panel, strokeWidth: 2 }) : /* @__PURE__ */ React.createElement("circle", { cx: x, cy: y, r, fill: colors.human, stroke: t.panel, strokeWidth: 2 }), /* @__PURE__ */ React.createElement("circle", { cx: x, cy: y, r: r + 8, fill: "transparent" }), /* @__PURE__ */ React.createElement("text", { x: out.x, y: out.y + (Math.abs(Math.cos(a)) <= 0.3 && shown.length > 1 ? Math.sin(a) > 0 ? 10 : -4 : 0), textAnchor: out.anchor, fontSize: 12, fill: t.text }, label.length > 16 ? `${label.slice(0, 15)}\u2026` : label), /* @__PURE__ */ React.createElement("title", null, `${label} (${p.role}): ${plural(p.messages, "message")}, ${p.sent} handoffs sent, ${p.answered} of ${p.received} received answered`));
-  })), /* @__PURE__ */ React.createElement("p", { style: { margin: "8px 0 0", color: t.subtle, fontSize: 12 } }, "An arrow points from the person mentioning to the person mentioned; thicker means more handoffs, dotted means none were answered. A mark grows with messages.", people.filter((p) => linked.has(p.id)).length > MAX_NODES && ` Showing the ${MAX_NODES} most active.`));
+  })), /* @__PURE__ */ React.createElement("p", { style: { margin: "8px 0 0", color: t.subtle, fontSize: 12 } }, "An arrow points from the person mentioning to the person mentioned. Thicker means more handoffs; the solid part is the share answered. A mark grows with messages.", busiest.length < people.filter((p) => linked.has(p.id)).length && ` Showing the ${MAX_NODES} most active.`));
 }
 
 // plugin/src/overview.tsx
 function Tiles({ summary: s, colors }) {
   const { human, agent, total } = s.messages;
-  return /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: t.gap } }, /* @__PURE__ */ React.createElement(Tile, { label: "Messages", value: String(total) }, total > 0 && /* @__PURE__ */ React.createElement("span", { title: `${human} from humans, ${agent} from agents` }, /* @__PURE__ */ React.createElement("span", { style: { display: "flex", gap: 2, height: 6, margin: "4px 0 6px" } }, human > 0 && /* @__PURE__ */ React.createElement("span", { style: { flex: human, background: colors.human, borderRadius: 3 } }), agent > 0 && /* @__PURE__ */ React.createElement("span", { style: { flex: agent, background: colors.agent, borderRadius: 3 } })), /* @__PURE__ */ React.createElement("span", { style: { display: "inline-flex", gap: 10, flexWrap: "wrap" } }, /* @__PURE__ */ React.createElement("span", null, /* @__PURE__ */ React.createElement(RoleMark, { role: "human", color: colors.human, size: 10 }), " ", human, " human"), /* @__PURE__ */ React.createElement("span", null, /* @__PURE__ */ React.createElement(RoleMark, { role: "agent", color: colors.agent, size: 10 }), " ", agent, " agent")))), /* @__PURE__ */ React.createElement(Tile, { label: "Handoffs answered", value: percent(s.allHandoffs.answered, s.allHandoffs.total) }, s.allHandoffs.total ? `${s.allHandoffs.answered} of ${plural(s.allHandoffs.total, "handoff")}` : "No one has mentioned anyone yet"), /* @__PURE__ */ React.createElement(Tile, { label: "Median reply", value: duration(s.allHandoffs.medianLatency) }, "from a mention to the answer"), /* @__PURE__ */ React.createElement(Tile, { label: "Agent loops", value: String(s.loops) }, "two agents back and forth, ", s.options.loopLength, "+ messages \xB7 longest agent run ", s.longestAgentRun), /* @__PURE__ */ React.createElement(Tile, { label: "Human interventions", value: String(s.interventions) }, "a human stepping into an agent run unasked"));
+  const [ref, width] = useWidth();
+  const columns = width >= 620 ? 4 : width >= 300 || !width ? 2 : 1;
+  const count = { display: "inline-flex", alignItems: "center", gap: 4, whiteSpace: "nowrap" };
+  return /* @__PURE__ */ React.createElement("div", { ref, style: { display: "grid", gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))`, gap: t.gap } }, /* @__PURE__ */ React.createElement(Tile, { label: "Messages", value: String(total) }, total > 0 && /* @__PURE__ */ React.createElement("span", { title: `${human} from humans, ${agent} from agents` }, /* @__PURE__ */ React.createElement("span", { style: { display: "flex", gap: 2, height: 6, margin: "4px 0 6px" } }, human > 0 && /* @__PURE__ */ React.createElement("span", { style: { flex: human, background: colors.human, borderRadius: 3 } }), agent > 0 && /* @__PURE__ */ React.createElement("span", { style: { flex: agent, background: colors.agent, borderRadius: 3 } })), /* @__PURE__ */ React.createElement("span", { style: { display: "flex", gap: 10, flexWrap: "wrap" } }, /* @__PURE__ */ React.createElement("span", { style: count }, /* @__PURE__ */ React.createElement(RoleMark, { role: "human", color: colors.human, size: 10 }), " ", human, " human"), /* @__PURE__ */ React.createElement("span", { style: count }, /* @__PURE__ */ React.createElement(RoleMark, { role: "agent", color: colors.agent, size: 10 }), " ", agent, " agent")))), s.allHandoffs.total ? /* @__PURE__ */ React.createElement(Tile, { label: "Handoffs answered", value: percent(s.allHandoffs.answered, s.allHandoffs.total) }, s.allHandoffs.answered, " of ", plural(s.allHandoffs.total, "handoff"), s.allHandoffs.medianLatency !== null && ` \xB7 median reply ${duration(s.allHandoffs.medianLatency)}`) : /* @__PURE__ */ React.createElement(Tile, { label: "Handoffs", value: "0" }, "a handoff is a message that mentions someone"), /* @__PURE__ */ React.createElement(Tile, { label: "Agent loops", value: String(s.loops) }, s.options.loopLength, "+ messages back and forth \xB7 longest agent run ", s.longestAgentRun), /* @__PURE__ */ React.createElement(Tile, { label: "Human interventions", value: String(s.interventions) }, "a human stepping into an agent run unasked"));
 }
 var ROLES = ["human", "agent"];
 function Pairings({ summary: s, colors }) {
@@ -202,10 +160,10 @@ function Pairings({ summary: s, colors }) {
 }
 
 // plugin/src/people.tsx
-function People({ people, names, colors }) {
+function People({ people, names, colors, handoffs: handoffs2 = true }) {
   const th = { padding: "0 10px 8px 0", textAlign: "left", fontWeight: 500, color: t.subtle, fontSize: 12, whiteSpace: "nowrap" };
   const td = { ...numeric, padding: "7px 10px 7px 0", borderTop: `1px solid ${t.border}`, color: t.text, whiteSpace: "nowrap" };
-  return /* @__PURE__ */ React.createElement("div", { style: { overflowX: "auto" } }, /* @__PURE__ */ React.createElement("table", { style: { width: "100%", borderCollapse: "collapse" } }, /* @__PURE__ */ React.createElement("thead", null, /* @__PURE__ */ React.createElement("tr", null, /* @__PURE__ */ React.createElement("th", { style: th }, "Person"), /* @__PURE__ */ React.createElement("th", { style: th }, "Messages"), /* @__PURE__ */ React.createElement("th", { style: th }, "Sent"), /* @__PURE__ */ React.createElement("th", { style: th }, "Received"), /* @__PURE__ */ React.createElement("th", { style: th }, "Answered"))), /* @__PURE__ */ React.createElement("tbody", null, people.map((p) => /* @__PURE__ */ React.createElement("tr", { key: p.id }, /* @__PURE__ */ React.createElement("td", { style: { ...td, whiteSpace: "nowrap" } }, /* @__PURE__ */ React.createElement(RoleMark, { role: p.role, color: colors[p.role] }), " ", names(p.id), " ", /* @__PURE__ */ React.createElement("span", { style: { color: t.subtle, fontSize: 12 } }, p.role)), /* @__PURE__ */ React.createElement("td", { style: td }, p.messages), /* @__PURE__ */ React.createElement("td", { style: td }, p.sent), /* @__PURE__ */ React.createElement("td", { style: td }, p.received), /* @__PURE__ */ React.createElement("td", { style: td, title: p.received ? `${p.answered} of ${p.received} answered` : void 0 }, percent(p.answered, p.received)))))));
+  return /* @__PURE__ */ React.createElement("div", { style: { overflowX: "auto" } }, /* @__PURE__ */ React.createElement("table", { style: { width: "100%", borderCollapse: "collapse" } }, /* @__PURE__ */ React.createElement("thead", null, /* @__PURE__ */ React.createElement("tr", null, /* @__PURE__ */ React.createElement("th", { style: th }, "Person"), /* @__PURE__ */ React.createElement("th", { style: th }, "Role"), /* @__PURE__ */ React.createElement("th", { style: th }, "Messages"), handoffs2 && /* @__PURE__ */ React.createElement("th", { style: th, title: "Handoffs this person started" }, "Sent"), handoffs2 && /* @__PURE__ */ React.createElement("th", { style: th, title: "Handoffs addressed to this person" }, "Received"), handoffs2 && /* @__PURE__ */ React.createElement("th", { style: th, title: "The share of those received that this person answered in time" }, "Answered"))), /* @__PURE__ */ React.createElement("tbody", null, people.map((p) => /* @__PURE__ */ React.createElement("tr", { key: p.id }, /* @__PURE__ */ React.createElement("td", { style: td }, /* @__PURE__ */ React.createElement("span", { style: { display: "inline-flex", alignItems: "center", gap: 6 } }, /* @__PURE__ */ React.createElement(RoleMark, { role: p.role, color: colors[p.role] }), " ", names(p.id))), /* @__PURE__ */ React.createElement("td", { style: { ...td, color: t.subtle } }, p.role), /* @__PURE__ */ React.createElement("td", { style: td }, p.messages), handoffs2 && /* @__PURE__ */ React.createElement("td", { style: td }, p.sent), handoffs2 && /* @__PURE__ */ React.createElement("td", { style: td }, p.received), handoffs2 && /* @__PURE__ */ React.createElement("td", { style: td, title: p.received ? `${p.answered} of ${p.received} answered` : void 0 }, percent(p.answered, p.received)))))));
 }
 
 // plugin/src/timeline.tsx
@@ -224,21 +182,25 @@ function Timeline({ beats, handoffs: handoffs2, names, colors }) {
   const counts = /* @__PURE__ */ new Map();
   for (const b of shown) counts.set(b.author, (counts.get(b.author) ?? 0) + 1);
   const ranked = [...counts.entries()].sort((a, b) => b[1] - a[1]).map(([id]) => id);
-  const lanes = ranked.length > MAX_LANES ? [...ranked.slice(0, MAX_LANES - 1), OTHERS] : ranked;
-  const laneOf = (author) => Math.max(0, lanes.indexOf(lanes.includes(author) ? author : OTHERS));
   const roleOfLane = new Map(shown.map((b) => [b.author, b.role]));
+  const kept = ranked.length > MAX_LANES ? ranked.slice(0, MAX_LANES - 1) : ranked;
+  const byRole = (role) => kept.filter((id) => roleOfLane.get(id) === role);
+  const lanes = [...byRole("human"), ...byRole("agent"), ...ranked.length > MAX_LANES ? [OTHERS] : []];
+  const laneOf = (author) => Math.max(0, lanes.indexOf(lanes.includes(author) ? author : OTHERS));
   const x = (i) => GUTTER + i * step;
   const y = (lane) => TOP + lane * LANE + LANE / 2;
-  const height = TOP + lanes.length * LANE + 6;
+  const height = TOP + lanes.length * LANE + 22;
+  const [first, last] = [shown[0], shown[shown.length - 1]];
+  const when = (at) => day(first.at) === day(last.at) ? clock(at) : day(at);
   const index = new Map(shown.map((b, i) => [b.id, i]));
   const bands = [];
   shown.forEach((b, i) => {
     if (!b.inLoop) return;
-    const last = bands[bands.length - 1];
-    if (last && last[1] === i - 1) last[1] = i;
+    const last2 = bands[bands.length - 1];
+    if (last2 && last2[1] === i - 1) last2[1] = i;
     else bands.push([i, i]);
   });
-  return /* @__PURE__ */ React.createElement("div", { ref, style: { minWidth: 0 } }, width > 0 && /* @__PURE__ */ React.createElement("svg", { width: "100%", height, role: "img", "aria-label": "Messages in order, one lane per person", style: { display: "block" } }, bands.map(([a, b], n) => /* @__PURE__ */ React.createElement("g", { key: a }, /* @__PURE__ */ React.createElement("rect", { x: x(a) - 6, y: TOP - 2, width: x(b) - x(a) + 12, height: lanes.length * LANE + 4, rx: 4, fill: t.text, opacity: 0.07 }), /* @__PURE__ */ React.createElement("text", { x: x(a) - 4, y: 12, fontSize: 11, fill: t.subtle }, n + 1 < bands.length && x(bands[n + 1][0]) - x(a) < 130 ? "\u21BB loop" : `\u21BB loop, ${b - a + 1} messages`))), lanes.map((id, i) => /* @__PURE__ */ React.createElement("g", { key: id }, /* @__PURE__ */ React.createElement("line", { x1: GUTTER - 8, x2: "100%", y1: y(i), y2: y(i), stroke: t.border, strokeWidth: 1 }), /* @__PURE__ */ React.createElement("text", { x: GUTTER - 14, y: y(i) + 4, textAnchor: "end", fontSize: 12, fill: t.text }, id === OTHERS ? `${ranked.length - MAX_LANES + 1} others` : names(id).length > 15 ? `${names(id).slice(0, 14)}\u2026` : names(id)))), handoffs2.map((h) => {
+  return /* @__PURE__ */ React.createElement("div", { ref, style: { minWidth: 0 } }, width > 0 && /* @__PURE__ */ React.createElement("svg", { width: "100%", height, role: "img", "aria-label": "Messages in order, one lane per person", style: { display: "block" } }, bands.map(([a, b], n) => /* @__PURE__ */ React.createElement("g", { key: a }, /* @__PURE__ */ React.createElement("rect", { x: x(a) - 6, y: TOP - 2, width: x(b) - x(a) + 12, height: lanes.length * LANE + 4, rx: 4, fill: t.text, opacity: 0.07 }), /* @__PURE__ */ React.createElement("text", { x: x(a) - 4, y: 12, fontSize: 11, fill: t.subtle }, n + 1 < bands.length && x(bands[n + 1][0]) - x(a) < 130 ? "\u21BB loop" : `\u21BB loop, ${b - a + 1} messages`))), lanes.map((id, i) => /* @__PURE__ */ React.createElement("g", { key: id }, /* @__PURE__ */ React.createElement("line", { x1: GUTTER - 8, x2: "100%", y1: y(i), y2: y(i), stroke: t.border, strokeWidth: 1 }), /* @__PURE__ */ React.createElement("text", { x: GUTTER - 14, y: y(i) + 4, textAnchor: "end", fontSize: 12, fill: t.text }, id === OTHERS ? `${ranked.length - MAX_LANES + 1} others` : names(id).length > 15 ? `${names(id).slice(0, 14)}\u2026` : names(id)))), /* @__PURE__ */ React.createElement("text", { x: GUTTER, y: height - 4, fontSize: 11, fill: t.subtle }, when(first.at)), shown.length > 1 && when(last.at) !== when(first.at) && /* @__PURE__ */ React.createElement("text", { x: x(shown.length - 1), y: height - 4, textAnchor: "end", fontSize: 11, fill: t.subtle }, when(last.at)), handoffs2.map((h) => {
     const from = index.get(h.id);
     const to = h.answeredBy ? index.get(h.answeredBy) : void 0;
     if (from === void 0 || to === void 0) return null;
@@ -248,7 +210,48 @@ function Timeline({ beats, handoffs: handoffs2, names, colors }) {
     const paint = b.dropped ? { fill: t.panel, stroke: colors[b.role], strokeWidth: 1.75 } : { fill: colors[b.role], stroke: t.panel, strokeWidth: 1.5 };
     const notes = [b.inLoop && "in a loop", b.intervention && "stepped into an agent run unasked", b.dropped && "handoff not answered"].filter(Boolean);
     return /* @__PURE__ */ React.createElement("g", { key: b.id }, b.intervention && /* @__PURE__ */ React.createElement("circle", { cx, cy, r: 8.5, fill: "none", stroke: t.text, strokeWidth: 1.25 }), b.role === "agent" ? /* @__PURE__ */ React.createElement("polygon", { points: hexagon(cx, cy, 5), ...paint }) : /* @__PURE__ */ React.createElement("circle", { cx, cy, r: 4.5, ...paint }), /* @__PURE__ */ React.createElement("circle", { cx, cy, r: Math.max(6, step / 2), fill: "transparent" }, /* @__PURE__ */ React.createElement("title", null, `${names(b.author)} \xB7 ${clock(b.at)}${notes.length ? ` \xB7 ${notes.join(", ")}` : ""}`)));
-  })), /* @__PURE__ */ React.createElement("p", { style: { margin: "8px 0 0", color: t.subtle, fontSize: 12 } }, shown.length < beats.length ? `The latest ${shown.length} of ${beats.length} messages` : `All ${beats.length} messages`, ", oldest on the left. A line joins a mention to its answer. Shaded: two agents going back and forth. Hollow: a handoff nobody answered. Ringed: a human stepping in unasked."));
+  })), /* @__PURE__ */ React.createElement("p", { style: { margin: "8px 0 0", color: t.subtle, fontSize: 12 } }, shown.length < beats.length ? `The latest ${shown.length} of ${beats.length} messages` : beats.length === 1 ? "The one message so far" : `All ${beats.length} messages`, ", in order from the left, evenly spaced whatever the time between them. A line joins a mention to its answer. Shaded: two agents going back and forth. Hollow: a handoff nobody answered. Ringed: a human stepping in unasked."));
+}
+
+// plugin/src/adapter.ts
+var MESSAGE_KIND = 9;
+var PROFILE_KIND = 0;
+function toMessage(e) {
+  const mentions = [...new Set(e.tags.filter((t2) => t2[0] === "p" && t2[1] && t2[1] !== e.pubkey).map((t2) => t2[1]))];
+  const root = e.tags.find((t2) => t2[0] === "e" && t2[1])?.[1];
+  return { id: e.id, author: e.pubkey, at: e.created_at, mentions, ...root ? { root } : {} };
+}
+function newest(profiles) {
+  const out = /* @__PURE__ */ new Map();
+  for (const p of profiles) {
+    const seen = out.get(p.pubkey);
+    if (!seen || p.created_at > seen.created_at) out.set(p.pubkey, p);
+  }
+  return out;
+}
+var profileContent = (p) => {
+  try {
+    const v = JSON.parse(p.content);
+    return v && typeof v === "object" ? v : {};
+  } catch {
+    return {};
+  }
+};
+function toRoster(profiles) {
+  const roster = {};
+  for (const [pubkey, p] of newest(profiles)) {
+    if (p.tags.some((t2) => t2[0] === "auth") || profileContent(p).bot === true) roster[pubkey] = "agent";
+  }
+  return roster;
+}
+function toNames(profiles) {
+  const names = {};
+  for (const [pubkey, p] of newest(profiles)) {
+    const c = profileContent(p);
+    const name = [c.display_name, c.name].find((v) => typeof v === "string" && v.trim());
+    if (typeof name === "string") names[pubkey] = name.trim().slice(0, 40);
+  }
+  return names;
 }
 
 // plugin/src/read.ts
@@ -404,36 +407,55 @@ function timeline(messages, roster, opts = DEFAULTS) {
     dropped: dropped.get(m.id) ?? 0
   }));
 }
+var shortId = (id) => id.length > 12 ? `${id.slice(0, 6)}\u2026${id.slice(-4)}` : id;
+function labels(people, named, anonymous = false) {
+  const out = {};
+  if (anonymous) {
+    const n = { human: 0, agent: 0 };
+    for (const p of people) out[p.id] = `${p.role === "human" ? "Human" : "Agent"} ${++n[p.role]}`;
+    return out;
+  }
+  const uses = /* @__PURE__ */ new Map();
+  for (const p of people) if (named[p.id]) uses.set(named[p.id], (uses.get(named[p.id]) ?? 0) + 1);
+  for (const p of people) {
+    const name = named[p.id];
+    out[p.id] = !name ? shortId(p.id) : uses.get(name) > 1 ? `${name} \xB7${p.id.slice(-4)}` : name;
+  }
+  return out;
+}
 
 // plugin/src/channel-view.tsx
-function useMeasures(state) {
+function useMeasures(state, anonymous = false) {
   return React.useMemo(() => {
     const d = state.data;
     if (!d) return void 0;
+    const people = participants(d.messages, d.roster);
+    const shown = labels(people, d.names, anonymous);
     return {
       summary: summarize(d.messages, d.roster),
-      people: participants(d.messages, d.roster),
+      people,
       edges: edges(d.messages, d.roster),
       beats: timeline(d.messages, d.roster),
       handoffs: handoffs(d.messages, d.roster),
-      names: (id) => d.names[id] ?? shortKey(id),
+      names: (id) => shown[id] ?? shortId(id),
       capped: d.capped
     };
-  }, [state.data]);
+  }, [state.data, anonymous]);
 }
 var spanText = (s) => {
   if (!s.span) return "";
   const { from, to } = s.span;
-  return day(from) === day(to) ? `${day(from)}, ${clock(from)} to ${clock(to)}` : `${day(from)} to ${day(to)}`;
+  if (day(from) !== day(to)) return `${day(from)} to ${day(to)}`;
+  return clock(from) === clock(to) ? `${day(from)}, ${clock(from)}` : `${day(from)}, ${clock(from)} to ${clock(to)}`;
 };
-function ChannelView({ name, state, colors, compact = false }) {
-  const m = useMeasures(state);
+function ChannelView({ name, state, colors, compact = false, anonymous = false }) {
+  const m = useMeasures(state, anonymous);
   const column = { display: "flex", flexDirection: "column", gap: t.gap, minWidth: 0 };
   if (!m) {
     return /* @__PURE__ */ React.createElement("div", { style: column }, /* @__PURE__ */ React.createElement("h2", { style: { margin: 0 } }, "#", name), /* @__PURE__ */ React.createElement(Quiet, null, state.status === "error" ? `Could not read this channel: ${state.error}` : "Reading the channel\u2026"));
   }
   const s = m.summary;
-  return /* @__PURE__ */ React.createElement("div", { style: column }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: t.gap, flexWrap: "wrap" } }, /* @__PURE__ */ React.createElement("h2", { style: { margin: 0 } }, "#", name), /* @__PURE__ */ React.createElement("span", { style: { display: "inline-flex", gap: 12, alignItems: "center", flexWrap: "wrap", color: t.subtle, fontSize: 12 } }, spanText(s), s.messages.total > 0 && /* @__PURE__ */ React.createElement(Legend, { colors }))), state.status === "error" && /* @__PURE__ */ React.createElement(Quiet, null, "Showing the last good read. The latest one failed: ", state.error), s.messages.total === 0 ? /* @__PURE__ */ React.createElement(Quiet, null, "No messages in this channel yet. Counts appear as people and agents talk.") : /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement(Tiles, { summary: s, colors }), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: t.gap } }, /* @__PURE__ */ React.createElement("div", { style: { flex: compact ? "1 1 100%" : "1 1 380px", minWidth: 0 } }, /* @__PURE__ */ React.createElement(Card, { title: "Who hands off to whom", note: `Answered within ${duration(s.options.handoffWindow)}` }, /* @__PURE__ */ React.createElement(Pairings, { summary: s, colors }))), /* @__PURE__ */ React.createElement("div", { style: { flex: compact ? "1 1 100%" : "1 1 380px", minWidth: 0 } }, /* @__PURE__ */ React.createElement(Card, { title: "Handoff network" }, /* @__PURE__ */ React.createElement(Network, { people: m.people, edges: m.edges, names: m.names, colors })))), /* @__PURE__ */ React.createElement(Card, { title: "Timeline" }, /* @__PURE__ */ React.createElement(Timeline, { beats: m.beats, handoffs: m.handoffs, names: m.names, colors })), /* @__PURE__ */ React.createElement(Card, { title: "People" }, /* @__PURE__ */ React.createElement(People, { people: m.people, names: m.names, colors })), m.capped && /* @__PURE__ */ React.createElement(Quiet, null, "Measured over the latest ", MESSAGE_LIMIT, " messages, the most Buzz returns in one read.")));
+  return /* @__PURE__ */ React.createElement("div", { style: column }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: t.gap, flexWrap: "wrap" } }, /* @__PURE__ */ React.createElement("h2", { style: { margin: 0 } }, "#", name), /* @__PURE__ */ React.createElement("span", { style: { display: "inline-flex", gap: 12, alignItems: "center", flexWrap: "wrap", color: t.subtle, fontSize: 12 } }, spanText(s), s.messages.total > 0 && /* @__PURE__ */ React.createElement(Legend, { colors }))), state.status === "error" && /* @__PURE__ */ React.createElement(Quiet, null, "Showing the last good read. The latest one failed: ", state.error), s.messages.total === 0 ? /* @__PURE__ */ React.createElement(Quiet, null, "No messages in this channel yet. Counts appear as people and agents talk.") : /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement(Tiles, { summary: s, colors }), s.allHandoffs.total > 0 && /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: t.gap } }, /* @__PURE__ */ React.createElement("div", { style: { flex: compact ? "1 1 100%" : "1 1 380px", minWidth: 0 } }, /* @__PURE__ */ React.createElement(Card, { title: "Who hands off to whom", note: `Answered within ${duration(s.options.handoffWindow)}` }, /* @__PURE__ */ React.createElement(Pairings, { summary: s, colors }))), /* @__PURE__ */ React.createElement("div", { style: { flex: compact ? "1 1 100%" : "1 1 380px", minWidth: 0 } }, /* @__PURE__ */ React.createElement(Card, { title: "Handoff network" }, /* @__PURE__ */ React.createElement(Network, { people: m.people, edges: m.edges, names: m.names, colors })))), /* @__PURE__ */ React.createElement(Card, { title: "Timeline" }, /* @__PURE__ */ React.createElement(Timeline, { beats: m.beats, handoffs: m.handoffs, names: m.names, colors })), /* @__PURE__ */ React.createElement(Card, { title: "People" }, /* @__PURE__ */ React.createElement(People, { people: m.people, names: m.names, colors, handoffs: s.allHandoffs.total > 0 })), m.capped && /* @__PURE__ */ React.createElement(Quiet, null, "Measured over the latest ", MESSAGE_LIMIT, " messages, the most Buzz returns in one read.")));
 }
 
 // plugin/src/compare.tsx
@@ -521,7 +543,8 @@ function CoordinationPage({ relay }) {
   const [a, setA] = React.useState(chosen.a);
   const [b, setB] = React.useState(chosen.b);
   const [comparing, setComparing] = React.useState(chosen.comparing ?? false);
-  Object.assign(chosen, { a, b, comparing });
+  const [anonymous, setAnonymous] = React.useState(chosen.anonymous ?? false);
+  Object.assign(chosen, { a, b, comparing, anonymous });
   const has = (id) => !!id && channels.some((c) => c.id === id);
   const idA = has(a) ? a : channels[0]?.id;
   const idB = comparing ? has(b) && b !== idA ? b : channels.find((c) => c.id !== idA)?.id : void 0;
@@ -538,7 +561,7 @@ function CoordinationPage({ relay }) {
     left.refresh();
     right.refresh();
   };
-  return /* @__PURE__ */ React.createElement(Frame, null, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" } }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("h1", { style: { margin: 0 } }, "Coordination"), /* @__PURE__ */ React.createElement("p", { style: { margin: "2px 0 0", color: t.subtle } }, "How people and agents hand work to each other in a channel.")), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: t.gap, flexWrap: "wrap" } }, picker(idA, setA, "Channel"), comparing && /* @__PURE__ */ React.createElement("span", { style: { color: t.subtle } }, "and"), comparing && picker(idB, setB, "Channel to compare with", idA), channels.length > 1 && /* @__PURE__ */ React.createElement("button", { type: "button", "aria-pressed": comparing, onClick: () => setComparing(!comparing) }, comparing ? "Stop comparing" : "Compare"), /* @__PURE__ */ React.createElement("button", { type: "button", onClick: refresh }, "Refresh"), /* @__PURE__ */ React.createElement("span", { style: { color: t.subtle, fontSize: 12, whiteSpace: "nowrap" }, title: "New messages are picked up as they arrive" }, left.live ? "\u25CF Live" : "", left.readAt ? ` \xB7 read ${clock(left.readAt / 1e3)}` : ""))), comparing && idB ? /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement(Compare, { left: { name: nameOf(idA), summary: leftMeasures?.summary }, right: { name: nameOf(idB), summary: rightMeasures?.summary } }), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 24, alignItems: "flex-start" } }, /* @__PURE__ */ React.createElement("div", { style: { flex: "1 1 420px", minWidth: 0 } }, /* @__PURE__ */ React.createElement(ChannelView, { name: nameOf(idA), state: left, colors, compact: true })), /* @__PURE__ */ React.createElement("div", { style: { flex: "1 1 420px", minWidth: 0 } }, /* @__PURE__ */ React.createElement(ChannelView, { name: nameOf(idB), state: right, colors, compact: true })))) : /* @__PURE__ */ React.createElement(ChannelView, { name: nameOf(idA), state: left, colors }), /* @__PURE__ */ React.createElement("p", { style: { margin: 0, color: t.subtle, fontSize: 12 } }, "Counts come from message order and mentions only; nothing reads what a message says. This plugin reads the channel and never posts."));
+  return /* @__PURE__ */ React.createElement(Frame, null, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" } }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("h1", { style: { margin: 0 } }, "Coordination"), /* @__PURE__ */ React.createElement("p", { style: { margin: "2px 0 0", color: t.subtle } }, "How people and agents hand work to each other in a channel.")), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: t.gap, flexWrap: "wrap" } }, picker(idA, setA, "Channel"), comparing && /* @__PURE__ */ React.createElement("span", { style: { color: t.subtle } }, "and"), comparing && picker(idB, setB, "Channel to compare with", idA), channels.length > 1 && /* @__PURE__ */ React.createElement("button", { type: "button", "aria-pressed": comparing, onClick: () => setComparing(!comparing) }, comparing ? "Stop comparing" : "Compare"), /* @__PURE__ */ React.createElement("button", { type: "button", "aria-pressed": anonymous, title: "Show everyone by role and number, for a screenshot that names nobody", onClick: () => setAnonymous(!anonymous) }, anonymous ? "Show names" : "Hide names"), /* @__PURE__ */ React.createElement("button", { type: "button", onClick: refresh }, "Refresh"), /* @__PURE__ */ React.createElement("span", { style: { color: t.subtle, fontSize: 12, whiteSpace: "nowrap" }, title: "New messages are picked up as they arrive" }, left.live ? "\u25CF Live" : "", left.readAt ? ` \xB7 read ${clock(left.readAt / 1e3)}` : ""))), comparing && idB ? /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement(Compare, { left: { name: nameOf(idA), summary: leftMeasures?.summary }, right: { name: nameOf(idB), summary: rightMeasures?.summary } }), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 24, alignItems: "flex-start" } }, /* @__PURE__ */ React.createElement("div", { style: { flex: "1 1 420px", minWidth: 0 } }, /* @__PURE__ */ React.createElement(ChannelView, { name: nameOf(idA), state: left, colors, compact: true, anonymous })), /* @__PURE__ */ React.createElement("div", { style: { flex: "1 1 420px", minWidth: 0 } }, /* @__PURE__ */ React.createElement(ChannelView, { name: nameOf(idB), state: right, colors, compact: true, anonymous })))) : /* @__PURE__ */ React.createElement(ChannelView, { name: nameOf(idA), state: left, colors, anonymous }), /* @__PURE__ */ React.createElement("p", { style: { margin: 0, color: t.subtle, fontSize: 12 } }, "Counts come from message order and mentions only; nothing reads what a message says. This plugin reads the channel and never posts."));
 }
 
 // plugin/src/panel.tsx

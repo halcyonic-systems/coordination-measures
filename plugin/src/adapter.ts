@@ -46,7 +46,7 @@ export function toRoster(profiles: readonly NostrEvent[]): Roster {
   return roster
 }
 
-/** Display names from profiles. Someone without one is shown by a short form of their key. */
+/** Display names from profiles. Someone without one gets a label from the core (`labels`). */
 export function toNames(profiles: readonly NostrEvent[]): Record<string, string> {
   const names: Record<string, string> = {}
   for (const [pubkey, p] of newest(profiles)) {
@@ -56,5 +56,3 @@ export function toNames(profiles: readonly NostrEvent[]): Record<string, string>
   }
   return names
 }
-
-export const shortKey = (pubkey: string) => (pubkey.length > 12 ? `${pubkey.slice(0, 6)}…${pubkey.slice(-4)}` : pubkey)

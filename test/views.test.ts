@@ -2,7 +2,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
-import { edges, participants, summarize, timeline, type Message, type Roster } from '../src/core/index.ts'
+import { edges, labels, participants, summarize, timeline, type Message, type Roster } from '../src/core/index.ts'
 
 const load = (name: string) =>
   JSON.parse(readFileSync(new URL(`../fixtures/${name}.json`, import.meta.url), 'utf8')) as { roster: Roster; messages: Message[] }
@@ -42,4 +42,17 @@ test('views agree with the summary', () => {
   const total = Object.values(s.handoffs).reduce((n, h) => n + h.total, 0)
   assert.equal(sent, total)
   assert.equal(edges(messages, roster).reduce((n, e) => n + e.handoffs, 0), total)
+})
+
+test('labels: a shared display name is told apart, a missing one falls back to the key', () => {
+  const { roster, messages } = load('loop')
+  const ps = participants(messages, roster)
+  assert.deepEqual(labels(ps, { referee: 'Fizz', scout: 'Fizz' }), { referee: 'Fizz ·eree', scout: 'Fizz ·cout', shingai: 'shingai' })
+  assert.deepEqual(labels(ps, { referee: 'Ref', shingai: 'S' }), { referee: 'Ref', scout: 'scout', shingai: 'S' })
+})
+
+test('labels: anonymous numbers each role in order and shows no name or key', () => {
+  const { roster, messages } = load('loop')
+  const ps = participants(messages, roster)
+  assert.deepEqual(labels(ps, { referee: 'Fizz', shingai: 'S' }, true), { referee: 'Agent 1', scout: 'Agent 2', shingai: 'Human 1' })
 })

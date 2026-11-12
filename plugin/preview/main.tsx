@@ -4,6 +4,8 @@
 //   ?mode=dark    dark colours
 //   ?compare=1    open with two channels side by side
 //   ?live=1       a new invented message every few seconds
+//   ?anon=1       names hidden: everyone shown by role and number
+//   ?channel=ID   open on one of the invented channels (demo-flat, demo-study, demo-quiet, demo-empty)
 import * as React from 'react'
 import { createRoot } from 'react-dom/client'
 import { apply } from '../src/index.tsx'
@@ -59,12 +61,20 @@ root.render(
   ),
 )
 
-if (params.get('compare')) {
-  // Press the page's own Compare button once it is on screen.
-  const press = () => {
-    const button = [...document.querySelectorAll('button')].find((b) => b.textContent === 'Compare')
-    if (button) button.click()
-    else requestAnimationFrame(press)
+// Press the page's own buttons once they are on screen.
+const press = (label: string) => {
+  const button = [...document.querySelectorAll('button')].find((b) => b.textContent === label)
+  if (button) button.click()
+  else requestAnimationFrame(() => press(label))
+}
+if (params.get('compare')) requestAnimationFrame(() => press('Compare'))
+if (params.get('anon')) requestAnimationFrame(() => press('Hide names'))
+if (params.get('channel')) {
+  const choose = () => {
+    const select = document.querySelector('select')
+    if (!select) return void requestAnimationFrame(choose)
+    select.value = params.get('channel')!
+    select.dispatchEvent(new Event('change', { bubbles: true }))
   }
-  requestAnimationFrame(press)
+  requestAnimationFrame(choose)
 }

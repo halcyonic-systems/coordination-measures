@@ -41,6 +41,7 @@ What the dashboard draws. Each regroups the measures above and adds none (`src/c
 |---|---|
 | **Participants** | Per person: messages, handoffs sent, handoffs received, and how many of those received they answered |
 | **Edges** | Per ordered pair of people: handoffs from the first to the second, and how many were answered. The handoff network draws these |
+| **Labels** | What each person is called on screen: their display name; a short form of their key when they have none; the name with the last four characters of the key when two people share it. With names hidden, each is numbered within their role, busiest first (Human 1, Agent 2), and the numbers are per channel: Agent 1 in one channel need not be Agent 1 in another |
 | **Timeline** | Per message, in order: its author and role, whether it is part of a loop, whether it is an intervention, and how many of its mentions were dropped |
 
 ## What version 0 does not do

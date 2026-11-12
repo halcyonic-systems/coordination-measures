@@ -17,7 +17,7 @@ function Frame({ children }: { children: React.ReactNode }) {
 }
 
 /** What was last chosen, kept while the app stays open (a plugin has no storage of its own). */
-const chosen: { a?: string; b?: string; comparing?: boolean } = {}
+const chosen: { a?: string; b?: string; comparing?: boolean; anonymous?: boolean } = {}
 
 export function CoordinationPage({ relay }: { relay: Relay }) {
   const session = useSession(relay)
@@ -26,7 +26,8 @@ export function CoordinationPage({ relay }: { relay: Relay }) {
   const [a, setA] = React.useState(chosen.a)
   const [b, setB] = React.useState(chosen.b)
   const [comparing, setComparing] = React.useState(chosen.comparing ?? false)
-  Object.assign(chosen, { a, b, comparing })
+  const [anonymous, setAnonymous] = React.useState(chosen.anonymous ?? false)
+  Object.assign(chosen, { a, b, comparing, anonymous })
 
   // Fall back to the first channel when nothing is chosen or the choice is gone.
   const has = (id?: string) => !!id && channels.some((c) => c.id === id)
@@ -69,6 +70,9 @@ export function CoordinationPage({ relay }: { relay: Relay }) {
               {comparing ? 'Stop comparing' : 'Compare'}
             </button>
           )}
+          <button type="button" aria-pressed={anonymous} title="Show everyone by role and number, for a screenshot that names nobody" onClick={() => setAnonymous(!anonymous)}>
+            {anonymous ? 'Show names' : 'Hide names'}
+          </button>
           <button type="button" onClick={refresh}>Refresh</button>
           <span style={{ color: t.subtle, fontSize: 12, whiteSpace: 'nowrap' }} title="New messages are picked up as they arrive">
             {left.live ? '● Live' : ''}{left.readAt ? ` · read ${clock(left.readAt / 1000)}` : ''}
@@ -79,12 +83,12 @@ export function CoordinationPage({ relay }: { relay: Relay }) {
         <>
           <Compare left={{ name: nameOf(idA), summary: leftMeasures?.summary }} right={{ name: nameOf(idB), summary: rightMeasures?.summary }} />
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 24, alignItems: 'flex-start' }}>
-            <div style={{ flex: '1 1 420px', minWidth: 0 }}><ChannelView name={nameOf(idA)} state={left} colors={colors} compact /></div>
-            <div style={{ flex: '1 1 420px', minWidth: 0 }}><ChannelView name={nameOf(idB)} state={right} colors={colors} compact /></div>
+            <div style={{ flex: '1 1 420px', minWidth: 0 }}><ChannelView name={nameOf(idA)} state={left} colors={colors} compact anonymous={anonymous} /></div>
+            <div style={{ flex: '1 1 420px', minWidth: 0 }}><ChannelView name={nameOf(idB)} state={right} colors={colors} compact anonymous={anonymous} /></div>
           </div>
         </>
       ) : (
-        <ChannelView name={nameOf(idA)} state={left} colors={colors} />
+        <ChannelView name={nameOf(idA)} state={left} colors={colors} anonymous={anonymous} />
       )}
       <p style={{ margin: 0, color: t.subtle, fontSize: 12 }}>
         Counts come from message order and mentions only; nothing reads what a message says. This plugin reads the channel and never posts.

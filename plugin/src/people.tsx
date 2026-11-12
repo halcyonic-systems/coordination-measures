@@ -4,7 +4,7 @@ import { RoleMark } from './parts.tsx'
 import { numeric, percent, t } from './theme.ts'
 import type { Participant, Role } from '../../src/core/index.ts'
 
-export function People({ people, names, colors }: { people: readonly Participant[]; names: (id: string) => string; colors: Record<Role, string> }) {
+export function People({ people, names, colors, handoffs = true }: { people: readonly Participant[]; names: (id: string) => string; colors: Record<Role, string>; handoffs?: boolean }) {
   const th: React.CSSProperties = { padding: '0 10px 8px 0', textAlign: 'left', fontWeight: 500, color: t.subtle, fontSize: 12, whiteSpace: 'nowrap' }
   const td: React.CSSProperties = { ...numeric, padding: '7px 10px 7px 0', borderTop: `1px solid ${t.border}`, color: t.text, whiteSpace: 'nowrap' }
   return (
@@ -13,22 +13,26 @@ export function People({ people, names, colors }: { people: readonly Participant
         <thead>
           <tr>
             <th style={th}>Person</th>
+            <th style={th}>Role</th>
             <th style={th}>Messages</th>
-            <th style={th}>Sent</th>
-            <th style={th}>Received</th>
-            <th style={th}>Answered</th>
+            {handoffs && <th style={th} title="Handoffs this person started">Sent</th>}
+            {handoffs && <th style={th} title="Handoffs addressed to this person">Received</th>}
+            {handoffs && <th style={th} title="The share of those received that this person answered in time">Answered</th>}
           </tr>
         </thead>
         <tbody>
           {people.map((p) => (
             <tr key={p.id}>
-              <td style={{ ...td, whiteSpace: 'nowrap' }}>
-                <RoleMark role={p.role} color={colors[p.role]} /> {names(p.id)} <span style={{ color: t.subtle, fontSize: 12 }}>{p.role}</span>
+              <td style={td}>
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                  <RoleMark role={p.role} color={colors[p.role]} /> {names(p.id)}
+                </span>
               </td>
+              <td style={{ ...td, color: t.subtle }}>{p.role}</td>
               <td style={td}>{p.messages}</td>
-              <td style={td}>{p.sent}</td>
-              <td style={td}>{p.received}</td>
-              <td style={td} title={p.received ? `${p.answered} of ${p.received} answered` : undefined}>{percent(p.answered, p.received)}</td>
+              {handoffs && <td style={td}>{p.sent}</td>}
+              {handoffs && <td style={td}>{p.received}</td>}
+              {handoffs && <td style={td} title={p.received ? `${p.answered} of ${p.received} answered` : undefined}>{percent(p.answered, p.received)}</td>}
             </tr>
           ))}
         </tbody>

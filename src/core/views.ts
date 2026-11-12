@@ -72,3 +72,28 @@ export function timeline(messages: readonly Message[], roster: Roster, opts: Opt
     inLoop: looped.has(m.id), intervention: ended.has(m.id), dropped: dropped.get(m.id) ?? 0,
   }))
 }
+
+/** A short form of a key, for someone with no display name. */
+export const shortId = (id: string): string => (id.length > 12 ? `${id.slice(0, 6)}…${id.slice(-4)}` : id)
+
+/**
+ * What to call each participant on screen. Someone with no display name is shown by a short form
+ * of their key. Two participants with one display name each get the last four characters of their
+ * key added, so their rows stay apart. With `anonymous`, nobody's name or key is shown: each is
+ * numbered within their role in the order given (Human 1, Agent 2).
+ */
+export function labels(people: readonly Participant[], named: Readonly<Record<string, string>>, anonymous = false): Record<string, string> {
+  const out: Record<string, string> = {}
+  if (anonymous) {
+    const n: Record<Role, number> = { human: 0, agent: 0 }
+    for (const p of people) out[p.id] = `${p.role === 'human' ? 'Human' : 'Agent'} ${++n[p.role]}`
+    return out
+  }
+  const uses = new Map<string, number>()
+  for (const p of people) if (named[p.id]) uses.set(named[p.id], (uses.get(named[p.id]) ?? 0) + 1)
+  for (const p of people) {
+    const name = named[p.id]
+    out[p.id] = !name ? shortId(p.id) : uses.get(name)! > 1 ? `${name} ·${p.id.slice(-4)}` : name
+  }
+  return out
+}
