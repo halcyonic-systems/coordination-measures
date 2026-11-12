@@ -18,7 +18,7 @@ Put two channels side by side and the same definitions apply to both, so a diffe
 
 ## Use it in your community
 
-1. In Buzz, open **Settings → Plugins → Manage plugins → Add**, choose **Browse** under Add from folder and pick `plugin/dist`.
+1. In Buzz, open **Settings → Plugins → Manage plugins → Add**, choose **Add from Git** and give it this repository's address. From a checkout, choose **Browse** under Add from folder and pick `plugin/dist`.
 2. Review the access shown (the plugin asks for none) and choose **Install plugin**.
 3. Open **Coordination** from the app's navigation and choose a channel you have joined. **Compare** sets two side by side.
 4. In any channel, the **Coordination** button in the channel header measures that channel in a side panel.
@@ -62,9 +62,8 @@ Buzz plugins run as unsandboxed code inside the app, and the session a plugin re
 ## State (2026-11-12)
 
 - Core: 16 tests pass. Plugin: builds and passes its check; planted writes fail it.
-- Seen working in Buzz: the page, a channel of two people and four agents (40 messages, 66 handoffs, every pairing present), Hide names and Copy as HTML.
+- Seen working in Buzz: installing from Git with this repository, the page, a channel of two people and four agents (40 messages, 66 handoffs, every pairing present), Hide names and Copy as HTML.
 - Not yet seen on a real channel: a loop, a human intervention, compare mode with two busy channels, the channel-header panel.
-- Not yet tried: adding the plugin from Git with this repository.
 
 ## License
 
