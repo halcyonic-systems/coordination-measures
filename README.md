@@ -1,4 +1,4 @@
-# coordination-monitor
+# coordination-measures
 
 A Buzz plugin that shows how the people and agents in a channel coordinate: who hands off to whom, how fast they answer, where agents loop and when a human steps in.
 
